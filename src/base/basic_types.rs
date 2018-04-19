@@ -461,9 +461,9 @@ impl<T: AxisDimension> From<usize> for PositiveAxisDiff<T> {
     }
 }
 
-/// ----------------------------------------------------------------------------
-/// Concrete types for concrete dimensions --------------------------------------
-/// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Concrete types for concrete dimensions -------------------------------------
+// ----------------------------------------------------------------------------
 
 /// Trait for all dimensions of a terminal grid. See RowDimension and ColDimension.
 pub trait AxisDimension: Copy {}
