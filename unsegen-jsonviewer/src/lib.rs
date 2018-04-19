@@ -7,39 +7,18 @@ extern crate json;
 #[cfg(not(test))]
 extern crate json;
 
-use unsegen::widget::{
-    Demand,
-    Demand2D,
-    RenderingHints,
-    Widget,
-};
+use unsegen::widget::{Demand, Demand2D, RenderingHints, Widget};
 use unsegen::base::basic_types::*;
-use unsegen::base::{
-    Color,
-    Cursor,
-    ExtentEstimationWindow,
-    ModifyMode,
-    StyleModifier,
-    Window,
-};
+use unsegen::base::{Color, Cursor, ExtentEstimationWindow, ModifyMode, StyleModifier, Window};
 
-use unsegen::input::{
-    Scrollable,
-    OperationResult,
-};
+use unsegen::input::{OperationResult, Scrollable};
 
 // Convenience reexport (We may want to add more items later):
 pub mod json_ext {
-    pub use json::{
-        Array,
-        JsonValue,
-        object,
-    };
+    pub use json::{object, Array, JsonValue};
 }
 
-use json::{
-    JsonValue,
-};
+use json::JsonValue;
 
 mod path;
 mod displayvalue;
@@ -80,7 +59,7 @@ impl JsonViewer {
         self.fix_active_element_path();
     }
 
-    pub fn select_next(&mut self) -> Result<(),()> {
+    pub fn select_next(&mut self) -> Result<(), ()> {
         if let Some(new_path) = self.active_element.clone().find_next_path(&self.value) {
             self.active_element = new_path;
             Ok(())
@@ -89,7 +68,7 @@ impl JsonViewer {
         }
     }
 
-    pub fn select_previous(&mut self) -> Result<(),()> {
+    pub fn select_previous(&mut self) -> Result<(), ()> {
         if let Some(new_path) = self.active_element.clone().find_previous_path(&self.value) {
             self.active_element = new_path;
             Ok(())
@@ -104,7 +83,7 @@ impl JsonViewer {
         self.active_element = tmp.fix_path_for_value(&self.value)
     }
 
-    pub fn toggle_active_element(&mut self) -> Result<(),()> {
+    pub fn toggle_active_element(&mut self) -> Result<(), ()> {
         let res = self.active_element.find_and_act_on_element(&mut self.value);
         self.fix_active_element_path();
         res
@@ -123,7 +102,12 @@ impl Widget for JsonViewer {
                 inactive_focused_style: self.inactive_focused_style,
                 item_changed_style: self.item_changed_style,
             };
-            self.value.draw(&mut cursor, Some(&self.active_element), &info, self.indentation);
+            self.value.draw(
+                &mut cursor,
+                Some(&self.active_element),
+                &info,
+                self.indentation,
+            );
         }
         Demand2D {
             width: Demand::at_least(window.extent_x()),
@@ -138,7 +122,12 @@ impl Widget for JsonViewer {
             inactive_focused_style: self.inactive_focused_style,
             item_changed_style: self.item_changed_style,
         };
-        self.value.draw(&mut cursor, Some(&self.active_element), &info, self.indentation);
+        self.value.draw(
+            &mut cursor,
+            Some(&self.active_element),
+            &info,
+            self.indentation,
+        );
     }
 }
 

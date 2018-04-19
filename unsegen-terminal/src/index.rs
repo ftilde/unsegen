@@ -19,14 +19,14 @@
 /// Indexing types and implementations for Grid and Line
 use std::cmp::{Ord, Ordering};
 use std::fmt;
-use std::ops::{self, Deref, Add, Range};
+use std::ops::{self, Add, Deref, Range};
 use unsegen::base::basic_types::*;
 
 /// The side of a cell
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Side {
     Left,
-    Right
+    Right,
 }
 
 /// Index in the grid using row, column notation
@@ -38,7 +38,10 @@ pub struct Point {
 
 impl Point {
     pub fn new(line: Line, col: Column) -> Point {
-        Point { line: line, col: col }
+        Point {
+            line: line,
+            col: col,
+        }
     }
 }
 
@@ -46,11 +49,10 @@ impl Ord for Point {
     fn cmp(&self, other: &Point) -> Ordering {
         use std::cmp::Ordering::*;
         match (self.line.cmp(&other.line), self.col.cmp(&other.col)) {
-            (Equal,   Equal) => Equal,
-            (Equal,   ord) |
-            (ord,     Equal) => ord,
-            (Less,    _)     => Less,
-            (Greater, _)     => Greater,
+            (Equal, Equal) => Equal,
+            (Equal, ord) | (ord, Equal) => ord,
+            (Less, _) => Less,
+            (Greater, _) => Greater,
         }
     }
 }
@@ -225,20 +227,15 @@ impl<T> From<Range<T>> for IndexRange<T> {
 }
 
 pub enum RangeInclusive<Idx> {
-    Empty {
-        at: Idx,
-    },
-    NonEmpty {
-        start: Idx,
-        end: Idx,
-    },
+    Empty { at: Idx },
+    NonEmpty { start: Idx, end: Idx },
 }
 
 impl<Idx> RangeInclusive<Idx> {
     pub fn new(from: Idx, to: Idx) -> Self {
         RangeInclusive::NonEmpty {
             start: from,
-            end: to
+            end: to,
         }
     }
 }
@@ -308,8 +305,10 @@ inclusive!(u8, steps_add_one_u8);
 
 #[test]
 fn test_range() {
-    assert_eq!(RangeInclusive::new(1,10).collect::<Vec<_>>(),
-               vec![1,2,3,4,5,6,7,8,9,10]);
+    assert_eq!(
+        RangeInclusive::new(1, 10).collect::<Vec<_>>(),
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    );
 }
 
 // can be removed if range_contains is stabilized
@@ -328,9 +327,11 @@ impl<T: PartialOrd<T>> Contains for Range<T> {
 impl<T: PartialOrd<T>> Contains for RangeInclusive<T> {
     type Content = T;
     fn contains_(&self, item: Self::Content) -> bool {
-        if let RangeInclusive::NonEmpty{ref start, ref end} = *self {
+        if let RangeInclusive::NonEmpty { ref start, ref end } = *self {
             (*start <= item) && (item <= *end)
-        } else { false }
+        } else {
+            false
+        }
     }
 }
 
@@ -462,7 +463,7 @@ ops!(Linear, Linear);
 
 #[cfg(test)]
 mod tests {
-    use super::{Line, Column, Point};
+    use super::{Column, Line, Point};
 
     #[test]
     fn location_ordering() {

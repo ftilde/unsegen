@@ -1,24 +1,8 @@
-use base::{
-    Window,
-    StyleModifier,
-};
+use base::{StyleModifier, Window};
 use base::basic_types::*;
-use input::{
-    Behavior,
-    Input,
-    Navigatable,
-    OperationResult,
-};
-use widget::{
-    ColDemand,
-    Demand,
-    Demand2D,
-    RowDemand,
-    SeparatingStyle,
-    RenderingHints,
-    Widget,
-    layout_linearly,
-};
+use input::{Behavior, Input, Navigatable, OperationResult};
+use widget::{layout_linearly, ColDemand, Demand, Demand2D, RenderingHints, RowDemand,
+             SeparatingStyle, Widget};
 
 pub struct Column<T: ?Sized> {
     pub access: fn(&T) -> &Widget,
@@ -76,7 +60,11 @@ pub struct Table<R: TableRow> {
 }
 
 impl<R: TableRow + 'static> Table<R> {
-    pub fn new(row_sep_style: SeparatingStyle, col_sep_style: SeparatingStyle, focused_style: StyleModifier) -> Self {
+    pub fn new(
+        row_sep_style: SeparatingStyle,
+        col_sep_style: SeparatingStyle,
+        focused_style: StyleModifier,
+    ) -> Self {
         Table {
             rows: Vec::new(),
             row_sep_style: row_sep_style,
@@ -88,9 +76,7 @@ impl<R: TableRow + 'static> Table<R> {
     }
 
     pub fn rows_mut<'a>(&'a mut self) -> RowsMut<'a, R> {
-        RowsMut {
-            table: self
-        }
+        RowsMut { table: self }
     }
 
     pub fn rows(&mut self) -> &Vec<R> {
@@ -109,7 +95,7 @@ impl<R: TableRow + 'static> Table<R> {
         layout_linearly(window.get_width(), separator_width, &x_demands)
     }
 
-    fn validate_row_pos(&mut self) -> Result<(),()> {
+    fn validate_row_pos(&mut self) -> Result<(), ()> {
         let max_pos = (self.rows.len() as u32).checked_sub(1).unwrap_or(0);
         if self.row_pos > max_pos {
             self.row_pos = max_pos;
@@ -119,7 +105,7 @@ impl<R: TableRow + 'static> Table<R> {
         }
     }
 
-    fn validate_col_pos(&mut self) -> Result<(),()> {
+    fn validate_col_pos(&mut self) -> Result<(), ()> {
         let max_pos = R::num_columns() as u32 - 1;
         if self.col_pos > max_pos {
             self.col_pos = max_pos;
@@ -147,9 +133,7 @@ impl<R: TableRow + 'static> Table<R> {
     }
 
     pub fn current_cell_behavior<'a>(&'a mut self) -> CurrentCellBehavior<'a, R> {
-        CurrentCellBehavior {
-            table: self,
-        }
+        CurrentCellBehavior { table: self }
     }
 }
 
@@ -183,10 +167,13 @@ impl<R: TableRow + 'static> Widget for Table<R> {
         }
 
         //Account all separators between cols
-        let x_demand = x_demands.iter().sum::<ColDemand>() + ColDemand::exact((self.col_sep_style.width() * (x_demands.len() as i32 -1)).positive_or_zero());
+        let x_demand = x_demands.iter().sum::<ColDemand>()
+            + ColDemand::exact(
+                (self.col_sep_style.width() * (x_demands.len() as i32 - 1)).positive_or_zero(),
+            );
         Demand2D {
             width: x_demand,
-            height: y_demand
+            height: y_demand,
         }
     }
     fn draw(&self, window: Window, hints: RenderingHints) {
@@ -199,53 +186,70 @@ impl<R: TableRow + 'static> Widget for Table<R> {
                 break;
             }
             let height = row.height_demand().min;
-            let (mut row_window, rest_window) = match window.unwrap().split_v(height.from_origin()) {
+            let (mut row_window, rest_window) = match window.unwrap().split_v(height.from_origin())
+            {
                 Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
                 Err(row_window) => (row_window, None),
             };
             window = rest_window;
 
-            if let (1, &SeparatingStyle::AlternatingStyle(modifier)) = (row_index%2, &self.row_sep_style) {
+            if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
+                (row_index % 2, &self.row_sep_style)
+            {
                 row_window.modify_default_style(&modifier);
             }
 
-            let mut iter = R::COLUMNS.iter().zip(column_widths.iter()).enumerate().peekable();
+            let mut iter = R::COLUMNS
+                .iter()
+                .zip(column_widths.iter())
+                .enumerate()
+                .peekable();
             while let Some((col_index, (col, &pos))) = iter.next() {
-                let (mut cell_window, r) = row_window.split_h(pos.from_origin()).expect("valid split pos from layout");
+                let (mut cell_window, r) = row_window
+                    .split_h(pos.from_origin())
+                    .expect("valid split pos from layout");
                 row_window = r;
 
-                if let (1, &SeparatingStyle::AlternatingStyle(modifier)) = (col_index%2, &self.col_sep_style) {
+                if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
+                    (col_index % 2, &self.col_sep_style)
+                {
                     cell_window.modify_default_style(&modifier);
                 }
 
-                let cell_draw_hints = if row_index as u32 == self.row_pos && col_index as u32 == self.col_pos {
-                    cell_window.modify_default_style(&self.focused_style);
-                    hints
-                } else {
-                    RenderingHints {
-                        active: false,
-                        .. hints
-                    }
-                };
+                let cell_draw_hints =
+                    if row_index as u32 == self.row_pos && col_index as u32 == self.col_pos {
+                        cell_window.modify_default_style(&self.focused_style);
+                        hints
+                    } else {
+                        RenderingHints {
+                            active: false,
+                            ..hints
+                        }
+                    };
 
                 cell_window.clear(); // Fill background using new style
                 (col.access)(row).draw(cell_window, cell_draw_hints);
-                if let (Some(_), &SeparatingStyle::Draw(ref c)) = (iter.peek(), &self.col_sep_style) {
+                if let (Some(_), &SeparatingStyle::Draw(ref c)) = (iter.peek(), &self.col_sep_style)
+                {
                     if row_window.get_width() > 0 {
-                        let (mut sep_window, r) = row_window.split_h(Width::from(c.width()).from_origin()).expect("valid split pos from layout");
+                        let (mut sep_window, r) = row_window
+                            .split_h(Width::from(c.width()).from_origin())
+                            .expect("valid split pos from layout");
                         row_window = r;
                         sep_window.fill(c.clone());
                     }
                 }
             }
-            if let (Some(_), &SeparatingStyle::Draw(ref c)) = (row_iter.peek(), &self.row_sep_style) {
+            if let (Some(_), &SeparatingStyle::Draw(ref c)) = (row_iter.peek(), &self.row_sep_style)
+            {
                 if window.is_none() {
                     break;
                 }
-                let (mut sep_window, rest_window) = match window.unwrap().split_v(height.from_origin()) {
-                    Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
-                    Err(row_window) => (row_window, None),
-                };
+                let (mut sep_window, rest_window) =
+                    match window.unwrap().split_v(height.from_origin()) {
+                        Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
+                        Err(row_window) => (row_window, None),
+                    };
                 window = rest_window;
                 sep_window.fill(c.clone());
             }

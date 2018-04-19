@@ -1,26 +1,13 @@
-use super::super::{
-    RowDemand,
-    ColDemand,
-    Demand2D,
-    RenderingHints,
-    Widget,
-};
-use base::{
-    Cursor,
-    Window,
-};
-use super::{
-    count_grapheme_clusters,
-};
+use super::super::{ColDemand, Demand2D, RenderingHints, RowDemand, Widget};
+use base::{Cursor, Window};
+use super::count_grapheme_clusters;
 
 pub struct LineLabel {
     text: String,
 }
 impl LineLabel {
     pub fn new<S: Into<String>>(text: S) -> Self {
-        LineLabel {
-            text: text.into(),
-        }
+        LineLabel { text: text.into() }
     }
 
     pub fn set<S: Into<String>>(&mut self, text: S) {

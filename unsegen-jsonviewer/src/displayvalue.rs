@@ -1,25 +1,13 @@
 use std::collections::BTreeMap;
 use unsegen::base::basic_types::*;
-use unsegen::widget::{
-    RenderingHints,
-};
-use unsegen::base::{
-    Cursor,
-    CursorTarget,
-    StyleModifier,
-};
+use unsegen::widget::RenderingHints;
+use unsegen::base::{Cursor, CursorTarget, StyleModifier};
 
-use json::{
-    JsonValue,
-};
+use json::JsonValue;
 
-use json::object::{
-    Object,
-};
+use json::object::Object;
 
-use std::cmp::{
-    min,
-};
+use std::cmp::min;
 
 use super::path::*;
 
@@ -75,15 +63,22 @@ impl DisplayObject {
             extended: true,
         };
         for (key, value) in obj.iter() {
-            result.members.insert(key.to_string(), DisplayValue::from_json(value));
+            result
+                .members
+                .insert(key.to_string(), DisplayValue::from_json(value));
         }
         result
     }
 
-    fn draw<T: CursorTarget>(&self, cursor: &mut Cursor<T>, path: Option<&ObjectPath>, info: &RenderingInfo, indentation: Width) {
-        use ::std::fmt::Write;
+    fn draw<T: CursorTarget>(
+        &self,
+        cursor: &mut Cursor<T>,
+        path: Option<&ObjectPath>,
+        info: &RenderingInfo,
+        indentation: Width,
+    ) {
+        use std::fmt::Write;
         if self.extended {
-
             {
                 write!(cursor, "{{ ").unwrap();
                 let mut cursor = cursor.save().style_modifier();
@@ -98,7 +93,8 @@ impl DisplayObject {
                 for (key, value) in self.members.iter() {
                     cursor.wrap_line();
                     write!(cursor, "{}: ", key).unwrap();
-                    let subpath = if let Some(&ObjectPath::Item(ref active_key, ref subpath)) = path {
+                    let subpath = if let Some(&ObjectPath::Item(ref active_key, ref subpath)) = path
+                    {
                         if active_key == key {
                             Some(subpath.as_ref())
                         } else {
@@ -183,8 +179,14 @@ impl DisplayArray {
         result
     }
 
-    fn draw<T: CursorTarget>(&self, cursor: &mut Cursor<T>, path: Option<&ArrayPath>, info: &RenderingInfo, indentation: Width) {
-        use ::std::fmt::Write;
+    fn draw<T: CursorTarget>(
+        &self,
+        cursor: &mut Cursor<T>,
+        path: Option<&ArrayPath>,
+        info: &RenderingInfo,
+        indentation: Width,
+    ) {
+        use std::fmt::Write;
 
         if self.extended {
             write!(cursor, " [").unwrap();
@@ -300,35 +302,61 @@ pub enum DisplayValue {
 impl DisplayValue {
     pub fn replace(&self, value: &JsonValue) -> Self {
         match (self, value) {
-            (&DisplayValue::Scalar(ref scalar), &JsonValue::Null)             => DisplayValue::Scalar(scalar.replace(&JsonValue::Null)),
-            (&DisplayValue::Scalar(ref scalar), &JsonValue::Short(ref val))   => DisplayValue::Scalar(scalar.replace(&val)),
-            (&DisplayValue::Scalar(ref scalar), &JsonValue::String(ref val))  => DisplayValue::Scalar(scalar.replace(&val)),
-            (&DisplayValue::Scalar(ref scalar), &JsonValue::Number(ref val))  => DisplayValue::Scalar(scalar.replace(&val)),
-            (&DisplayValue::Scalar(ref scalar), &JsonValue::Boolean(ref val)) => DisplayValue::Scalar(scalar.replace(&val)),
-            (&DisplayValue::Object(ref obj),    &JsonValue::Object(ref val))  => DisplayValue::Object(obj.replace(&val)),
-            (&DisplayValue::Array(ref array),   &JsonValue::Array(ref val))   => DisplayValue::Array(array.replace(&val)),
-            (_,                                 val)                          => Self::from_json(val),
+            (&DisplayValue::Scalar(ref scalar), &JsonValue::Null) => {
+                DisplayValue::Scalar(scalar.replace(&JsonValue::Null))
+            }
+            (&DisplayValue::Scalar(ref scalar), &JsonValue::Short(ref val)) => {
+                DisplayValue::Scalar(scalar.replace(&val))
+            }
+            (&DisplayValue::Scalar(ref scalar), &JsonValue::String(ref val)) => {
+                DisplayValue::Scalar(scalar.replace(&val))
+            }
+            (&DisplayValue::Scalar(ref scalar), &JsonValue::Number(ref val)) => {
+                DisplayValue::Scalar(scalar.replace(&val))
+            }
+            (&DisplayValue::Scalar(ref scalar), &JsonValue::Boolean(ref val)) => {
+                DisplayValue::Scalar(scalar.replace(&val))
+            }
+            (&DisplayValue::Object(ref obj), &JsonValue::Object(ref val)) => {
+                DisplayValue::Object(obj.replace(&val))
+            }
+            (&DisplayValue::Array(ref array), &JsonValue::Array(ref val)) => {
+                DisplayValue::Array(array.replace(&val))
+            }
+            (_, val) => Self::from_json(val),
         }
     }
 
     pub fn from_json(value: &JsonValue) -> Self {
         match value {
-            &JsonValue::Null             => DisplayValue::Scalar(DisplayScalar::from_json(&JsonValue::Null)),
-            &JsonValue::Short(ref val)   => DisplayValue::Scalar(DisplayScalar::from_json(&val)),
-            &JsonValue::String(ref val)  => DisplayValue::Scalar(DisplayScalar::from_json(&val)),
-            &JsonValue::Number(ref val)  => DisplayValue::Scalar(DisplayScalar::from_json(&val)),
+            &JsonValue::Null => DisplayValue::Scalar(DisplayScalar::from_json(&JsonValue::Null)),
+            &JsonValue::Short(ref val) => DisplayValue::Scalar(DisplayScalar::from_json(&val)),
+            &JsonValue::String(ref val) => DisplayValue::Scalar(DisplayScalar::from_json(&val)),
+            &JsonValue::Number(ref val) => DisplayValue::Scalar(DisplayScalar::from_json(&val)),
             &JsonValue::Boolean(ref val) => DisplayValue::Scalar(DisplayScalar::from_json(&val)),
-            &JsonValue::Object(ref val)  => DisplayValue::Object(DisplayObject::from_json(&val)),
-            &JsonValue::Array(ref val)   => DisplayValue::Array(DisplayArray::from_json(&val)),
+            &JsonValue::Object(ref val) => DisplayValue::Object(DisplayObject::from_json(&val)),
+            &JsonValue::Array(ref val) => DisplayValue::Array(DisplayArray::from_json(&val)),
         }
     }
-    pub fn draw<T: CursorTarget>(&self, cursor: &mut Cursor<T>, path: Option<&Path>, info: &RenderingInfo, indentation: Width) {
+    pub fn draw<T: CursorTarget>(
+        &self,
+        cursor: &mut Cursor<T>,
+        path: Option<&Path>,
+        info: &RenderingInfo,
+        indentation: Width,
+    ) {
         match (self, path) {
-            (&DisplayValue::Scalar(ref scalar), Some(&Path::Scalar)) => scalar.draw(cursor, true, info),
+            (&DisplayValue::Scalar(ref scalar), Some(&Path::Scalar)) => {
+                scalar.draw(cursor, true, info)
+            }
             (&DisplayValue::Scalar(ref scalar), None) => scalar.draw(cursor, false, info),
-            (&DisplayValue::Object(ref obj), Some(&Path::Object(ref op))) => obj.draw(cursor, Some(op), info, indentation),
+            (&DisplayValue::Object(ref obj), Some(&Path::Object(ref op))) => {
+                obj.draw(cursor, Some(op), info, indentation)
+            }
             (&DisplayValue::Object(ref obj), None) => obj.draw(cursor, None, info, indentation),
-            (&DisplayValue::Array(ref array), Some(&Path::Array(ref ap))) => array.draw(cursor, Some(ap), info, indentation),
+            (&DisplayValue::Array(ref array), Some(&Path::Array(ref ap))) => {
+                array.draw(cursor, Some(ap), info, indentation)
+            }
             (&DisplayValue::Array(ref array), None) => array.draw(cursor, None, info, indentation),
             _ => panic!("Mismatched DisplayValue and path type!"),
         }
@@ -337,7 +365,6 @@ impl DisplayValue {
 
 #[cfg(test)]
 impl DisplayValue {
-
     pub fn unwrap_scalar_ref(&self) -> &DisplayScalar {
         if let &DisplayValue::Scalar(ref val) = self {
             val

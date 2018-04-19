@@ -65,15 +65,15 @@ impl ModifyMode {
             (ModifyMode::Toggle, ModifyMode::No) => ModifyMode::Yes,
             (ModifyMode::Toggle, ModifyMode::Toggle) => ModifyMode::No,
             (ModifyMode::Toggle, ModifyMode::LeaveUnchanged) => ModifyMode::Toggle,
-            (ModifyMode::LeaveUnchanged, m) => m
+            (ModifyMode::LeaveUnchanged, m) => m,
         }
     }
     fn modify(&self, should_invert: &mut bool) {
         match *self {
-            ModifyMode::Yes => { *should_invert = true },
-            ModifyMode::No => { *should_invert = false },
-            ModifyMode::Toggle => { *should_invert ^= true },
-            ModifyMode::LeaveUnchanged => { },
+            ModifyMode::Yes => *should_invert = true,
+            ModifyMode::No => *should_invert = false,
+            ModifyMode::Toggle => *should_invert ^= true,
+            ModifyMode::LeaveUnchanged => {}
         }
     }
 }
@@ -146,11 +146,7 @@ impl Default for TextFormatModifier {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Color {
-    Rgb {
-        r: u8,
-        g: u8,
-        b: u8,
-    },
+    Rgb { r: u8, g: u8, b: u8 },
     Ansi(u8),
     Black,
     Blue,
@@ -172,7 +168,7 @@ pub enum Color {
 
 impl Color {
     pub fn ansi_rgb(r: u8, g: u8, b: u8) -> Self {
-        Color::Ansi(termion::color::AnsiValue::rgb(r,g,b).0)
+        Color::Ansi(termion::color::AnsiValue::rgb(r, g, b).0)
     }
     pub fn ansi_grayscale(v: u8 /* < 24 */) -> Self {
         Color::Ansi(termion::color::AnsiValue::grayscale(v).0)
@@ -183,22 +179,22 @@ impl Color {
         match self {
             &Color::Rgb { r, g, b } => write!(terminal, "{}", Target(termion::color::Rgb(r, g, b))),
             &Color::Ansi(v) => write!(terminal, "{}", Target(termion::color::AnsiValue(v))),
-            &Color::Black   => write!(terminal, "{}", Target(termion::color::Black)),
-            &Color::Blue    => write!(terminal, "{}", Target(termion::color::Blue)),
-            &Color::Cyan    => write!(terminal, "{}", Target(termion::color::Cyan)),
+            &Color::Black => write!(terminal, "{}", Target(termion::color::Black)),
+            &Color::Blue => write!(terminal, "{}", Target(termion::color::Blue)),
+            &Color::Cyan => write!(terminal, "{}", Target(termion::color::Cyan)),
             &Color::Magenta => write!(terminal, "{}", Target(termion::color::Magenta)),
-            &Color::Green   => write!(terminal, "{}", Target(termion::color::Green)),
-            &Color::Red     => write!(terminal, "{}", Target(termion::color::Red)),
-            &Color::White   => write!(terminal, "{}", Target(termion::color::White)),
-            &Color::Yellow  => write!(terminal, "{}", Target(termion::color::Yellow)),
-            &Color::LightBlack   => write!(terminal, "{}", Target(termion::color::LightBlack)),
-            &Color::LightBlue    => write!(terminal, "{}", Target(termion::color::LightBlue)),
-            &Color::LightCyan    => write!(terminal, "{}", Target(termion::color::LightCyan)),
+            &Color::Green => write!(terminal, "{}", Target(termion::color::Green)),
+            &Color::Red => write!(terminal, "{}", Target(termion::color::Red)),
+            &Color::White => write!(terminal, "{}", Target(termion::color::White)),
+            &Color::Yellow => write!(terminal, "{}", Target(termion::color::Yellow)),
+            &Color::LightBlack => write!(terminal, "{}", Target(termion::color::LightBlack)),
+            &Color::LightBlue => write!(terminal, "{}", Target(termion::color::LightBlue)),
+            &Color::LightCyan => write!(terminal, "{}", Target(termion::color::LightCyan)),
             &Color::LightMagenta => write!(terminal, "{}", Target(termion::color::LightMagenta)),
-            &Color::LightGreen   => write!(terminal, "{}", Target(termion::color::LightGreen)),
-            &Color::LightRed     => write!(terminal, "{}", Target(termion::color::LightRed)),
-            &Color::LightWhite   => write!(terminal, "{}", Target(termion::color::LightWhite)),
-            &Color::LightYellow  => write!(terminal, "{}", Target(termion::color::LightYellow)),
+            &Color::LightGreen => write!(terminal, "{}", Target(termion::color::LightGreen)),
+            &Color::LightRed => write!(terminal, "{}", Target(termion::color::LightRed)),
+            &Color::LightWhite => write!(terminal, "{}", Target(termion::color::LightWhite)),
+            &Color::LightYellow => write!(terminal, "{}", Target(termion::color::LightYellow)),
         }
     }
     fn set_terminal_attributes_bg<W: Write>(&self, terminal: &mut W) -> ::std::io::Result<()> {
@@ -206,22 +202,22 @@ impl Color {
         match self {
             &Color::Rgb { r, g, b } => write!(terminal, "{}", Target(termion::color::Rgb(r, g, b))),
             &Color::Ansi(v) => write!(terminal, "{}", Target(termion::color::AnsiValue(v))),
-            &Color::Black   => write!(terminal, "{}", Target(termion::color::Black)),
-            &Color::Blue    => write!(terminal, "{}", Target(termion::color::Blue)),
-            &Color::Cyan    => write!(terminal, "{}", Target(termion::color::Cyan)),
+            &Color::Black => write!(terminal, "{}", Target(termion::color::Black)),
+            &Color::Blue => write!(terminal, "{}", Target(termion::color::Blue)),
+            &Color::Cyan => write!(terminal, "{}", Target(termion::color::Cyan)),
             &Color::Magenta => write!(terminal, "{}", Target(termion::color::Magenta)),
-            &Color::Green   => write!(terminal, "{}", Target(termion::color::Green)),
-            &Color::Red     => write!(terminal, "{}", Target(termion::color::Red)),
-            &Color::White   => write!(terminal, "{}", Target(termion::color::White)),
-            &Color::Yellow  => write!(terminal, "{}", Target(termion::color::Yellow)),
-            &Color::LightBlack   => write!(terminal, "{}", Target(termion::color::LightBlack)),
-            &Color::LightBlue    => write!(terminal, "{}", Target(termion::color::LightBlue)),
-            &Color::LightCyan    => write!(terminal, "{}", Target(termion::color::LightCyan)),
+            &Color::Green => write!(terminal, "{}", Target(termion::color::Green)),
+            &Color::Red => write!(terminal, "{}", Target(termion::color::Red)),
+            &Color::White => write!(terminal, "{}", Target(termion::color::White)),
+            &Color::Yellow => write!(terminal, "{}", Target(termion::color::Yellow)),
+            &Color::LightBlack => write!(terminal, "{}", Target(termion::color::LightBlack)),
+            &Color::LightBlue => write!(terminal, "{}", Target(termion::color::LightBlue)),
+            &Color::LightCyan => write!(terminal, "{}", Target(termion::color::LightCyan)),
             &Color::LightMagenta => write!(terminal, "{}", Target(termion::color::LightMagenta)),
-            &Color::LightGreen   => write!(terminal, "{}", Target(termion::color::LightGreen)),
-            &Color::LightRed     => write!(terminal, "{}", Target(termion::color::LightRed)),
-            &Color::LightWhite   => write!(terminal, "{}", Target(termion::color::LightWhite)),
-            &Color::LightYellow  => write!(terminal, "{}", Target(termion::color::LightYellow)),
+            &Color::LightGreen => write!(terminal, "{}", Target(termion::color::LightGreen)),
+            &Color::LightRed => write!(terminal, "{}", Target(termion::color::LightRed)),
+            &Color::LightWhite => write!(terminal, "{}", Target(termion::color::LightWhite)),
+            &Color::LightYellow => write!(terminal, "{}", Target(termion::color::LightYellow)),
         }
     }
 }
@@ -248,7 +244,7 @@ impl Style {
         Style {
             fg_color: fg_color,
             bg_color: bg_color,
-            format: format
+            format: format,
         }
     }
 
@@ -257,8 +253,12 @@ impl Style {
     }
 
     pub fn set_terminal_attributes<W: Write>(&self, terminal: &mut W) {
-        self.fg_color.set_terminal_attributes_fg(terminal).expect("write fg_color");
-        self.bg_color.set_terminal_attributes_bg(terminal).expect("write bg_color");
+        self.fg_color
+            .set_terminal_attributes_fg(terminal)
+            .expect("write fg_color");
+        self.bg_color
+            .set_terminal_attributes_bg(terminal)
+            .expect("write bg_color");
         self.format.set_terminal_attributes(terminal);
     }
 }

@@ -1,21 +1,7 @@
-use super::{
-    CursorTarget,
-    Style,
-    StyleModifier,
-    GraphemeCluster,
-};
-use ndarray::{
-    Array,
-    ArrayViewMut,
-    Axis,
-    Ix,
-    Ix2,
-};
-use std::cmp::{max};
-use base::ranges::{
-    Bound,
-    RangeArgument,
-};
+use super::{CursorTarget, GraphemeCluster, Style, StyleModifier};
+use ndarray::{Array, ArrayViewMut, Axis, Ix, Ix2};
+use std::cmp::max;
+use base::ranges::{Bound, RangeArgument};
 use base::basic_types::*;
 use std::fmt;
 
@@ -55,9 +41,7 @@ impl WindowBuffer {
     }
 
     pub fn from_storage(storage: CharMatrix) -> Self {
-        WindowBuffer {
-            storage: storage,
-        }
+        WindowBuffer { storage: storage }
     }
 
     pub fn as_window<'a>(&'a mut self) -> Window<'a> {
@@ -107,33 +91,46 @@ impl<'w> Window<'w> {
         }
     }
 
-    pub fn create_subwindow<'a, WX: RangeArgument<ColIndex>, WY: RangeArgument<RowIndex>>(&'a mut self, x_range: WX, y_range: WY) -> Window<'a> {
+    pub fn create_subwindow<'a, WX: RangeArgument<ColIndex>, WY: RangeArgument<RowIndex>>(
+        &'a mut self,
+        x_range: WX,
+        y_range: WY,
+    ) -> Window<'a> {
         let x_range_start = match x_range.start() {
             Bound::Unbound => ColIndex::new(0),
             Bound::Inclusive(i) => i,
-            Bound::Exclusive(i) => i-1,
+            Bound::Exclusive(i) => i - 1,
         };
         let x_range_end = match x_range.end() {
             Bound::Unbound => self.get_width().from_origin(),
-            Bound::Inclusive(i) => i-1,
+            Bound::Inclusive(i) => i - 1,
             Bound::Exclusive(i) => i,
         };
         let y_range_start = match y_range.start() {
             Bound::Unbound => RowIndex::new(0),
             Bound::Inclusive(i) => i,
-            Bound::Exclusive(i) => i-1,
+            Bound::Exclusive(i) => i - 1,
         };
         let y_range_end = match y_range.end() {
             Bound::Unbound => self.get_height().from_origin(),
-            Bound::Inclusive(i) => i-1,
+            Bound::Inclusive(i) => i - 1,
             Bound::Exclusive(i) => i,
         };
         assert!(x_range_start <= x_range_end, "Invalid x_range: start > end");
         assert!(y_range_start <= y_range_end, "Invalid y_range: start > end");
-        assert!(x_range_end <= self.get_width().from_origin(), "Invalid x_range: end > width");
-        assert!(y_range_end <= self.get_height().from_origin(), "Invalid y_range: end > height");
+        assert!(
+            x_range_end <= self.get_width().from_origin(),
+            "Invalid x_range: end > width"
+        );
+        assert!(
+            y_range_end <= self.get_height().from_origin(),
+            "Invalid y_range: end > height"
+        );
 
-        let sub_mat = self.values.slice_mut(s![y_range_start.into()..y_range_end.into(), x_range_start.into()..x_range_end.into()]);
+        let sub_mat = self.values.slice_mut(s![
+            y_range_start.into()..y_range_end.into(),
+            x_range_start.into()..x_range_end.into()
+        ]);
         Window {
             values: sub_mat,
             default_style: self.default_style,
@@ -141,8 +138,9 @@ impl<'w> Window<'w> {
     }
 
     pub fn split_v(self, split_pos: RowIndex) -> Result<(Self, Self), Self> {
-        if (self.get_height()+Height::new(1).unwrap()).origin_range_contains(split_pos) {
-            let (first_mat, second_mat) = self.values.split_at(Axis(0), split_pos.raw_value() as Ix);
+        if (self.get_height() + Height::new(1).unwrap()).origin_range_contains(split_pos) {
+            let (first_mat, second_mat) =
+                self.values.split_at(Axis(0), split_pos.raw_value() as Ix);
             let w_u = Window {
                 values: first_mat,
                 default_style: self.default_style,
@@ -158,8 +156,9 @@ impl<'w> Window<'w> {
     }
 
     pub fn split_h(self, split_pos: ColIndex) -> Result<(Self, Self), Self> {
-        if (self.get_width()+Width::new(1).unwrap()).origin_range_contains(split_pos) {
-            let (first_mat, second_mat) = self.values.split_at(Axis(1), split_pos.raw_value() as Ix);
+        if (self.get_width() + Width::new(1).unwrap()).origin_range_contains(split_pos) {
+            let (first_mat, second_mat) =
+                self.values.split_at(Axis(1), split_pos.raw_value() as Ix);
             let w_l = Window {
                 values: first_mat,
                 default_style: self.default_style,
@@ -239,7 +238,6 @@ impl<'a> CursorTarget for Window<'a> {
     }
 }
 
-
 pub struct ExtentEstimationWindow {
     some_value: StyledGraphemeCluster,
     default_style: Style,
@@ -251,8 +249,8 @@ pub struct ExtentEstimationWindow {
 //FIXME: compile time evaluation, see https://github.com/rust-lang/rust/issues/24111
 //pub const UNBOUNDED_WIDTH: Width = Width::new(2147483647).unwrap();//i32::max_value() as u32;
 //pub const UNBOUNDED_HEIGHT: Height = Height::new(2147483647).unwrap();//i32::max_value() as u32;
-pub const UNBOUNDED_WIDTH: i32 = 2147483647;//i32::max_value() as u32;
-pub const UNBOUNDED_HEIGHT: i32 = 2147483647;//i32::max_value() as u32;
+pub const UNBOUNDED_WIDTH: i32 = 2147483647; //i32::max_value() as u32;
+pub const UNBOUNDED_HEIGHT: i32 = 2147483647; //i32::max_value() as u32;
 
 impl ExtentEstimationWindow {
     pub fn with_width(width: Width) -> Self {
@@ -279,7 +277,8 @@ impl ExtentEstimationWindow {
     }
 
     fn reset_value(&mut self) {
-        self.some_value = StyledGraphemeCluster::new(GraphemeCluster::space().into(), self.default_style);
+        self.some_value =
+            StyledGraphemeCluster::new(GraphemeCluster::space().into(), self.default_style);
     }
 }
 
@@ -291,8 +290,8 @@ impl CursorTarget for ExtentEstimationWindow {
         Height::new(UNBOUNDED_HEIGHT).unwrap()
     }
     fn get_cell_mut(&mut self, x: ColIndex, y: RowIndex) -> Option<&mut StyledGraphemeCluster> {
-        self.extent_x = max(self.extent_x, (x.diff_to_origin()+1).positive_or_zero());
-        self.extent_y = max(self.extent_y, (y.diff_to_origin()+1).positive_or_zero());
+        self.extent_x = max(self.extent_x, (x.diff_to_origin() + 1).positive_or_zero());
+        self.extent_y = max(self.extent_y, (y.diff_to_origin() + 1).positive_or_zero());
         self.reset_value();
         if x < self.width.from_origin() {
             Some(&mut self.some_value)

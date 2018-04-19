@@ -1,36 +1,12 @@
-use std::cmp::{
-    min,
-};
-use std::cell::{
-    RefCell,
-};
+use std::cmp::min;
+use std::cell::RefCell;
 use std::fmt;
-use std::fs::{
-    File,
-    Metadata,
-};
+use std::fs::{File, Metadata};
 use std::io;
-use std::io::{
-    BufReader,
-    BufRead,
-    SeekFrom,
-    Seek,
-};
-use std::path::{
-    Path,
-    PathBuf,
-};
-use std::ops:: {
-    Add,
-    AddAssign,
-    Sub,
-    SubAssign,
-    Range,
-};
-use base::ranges::{
-    Bound,
-    RangeArgument,
-};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::ops::{Add, AddAssign, Range, Sub, SubAssign};
+use base::ranges::{Bound, RangeArgument};
 // Starting from 0, i.e., treating LineStorage like an array of lines
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug, Hash)]
 pub struct LineIndex(pub usize);
@@ -121,7 +97,10 @@ impl Sub<usize> for LineNumber {
     type Output = Self;
     fn sub(self, rhs: usize) -> Self {
         let raw_number: usize = self.into();
-        debug_assert!(raw_number > rhs, "Overflowing sub on LineNumber: Result would be <= 0");
+        debug_assert!(
+            raw_number > rhs,
+            "Overflowing sub on LineNumber: Result would be <= 0"
+        );
         LineNumber(raw_number - rhs)
     }
 }
@@ -140,14 +119,22 @@ pub trait LineStorage {
     type Line;
     fn view_line<I: Into<LineIndex>>(&self, pos: I) -> Option<Self::Line>;
 
-    fn view<'a, I: Into<LineIndex>, R: RangeArgument<I>>(&'a self, range: R) -> Box<DoubleEndedIterator<Item=(LineIndex, Self::Line)> + 'a>
-        where Self: ::std::marker::Sized { // Not exactly sure, why this is needed... we only store a reference?!
-        let start: LineIndex = match range.start() { // Always inclusive
+    fn view<'a, I: Into<LineIndex>, R: RangeArgument<I>>(
+        &'a self,
+        range: R,
+    ) -> Box<DoubleEndedIterator<Item = (LineIndex, Self::Line)> + 'a>
+    where
+        Self: ::std::marker::Sized,
+    {
+        // Not exactly sure, why this is needed... we only store a reference?!
+        let start: LineIndex = match range.start() {
+            // Always inclusive
             Bound::Unbound => LineIndex(0),
             Bound::Inclusive(i) => i.into(),
-            Bound::Exclusive(i) => i.into()+1,
+            Bound::Exclusive(i) => i.into() + 1,
         };
-        let end: LineIndex = match range.end() { // Always exclusive
+        let end: LineIndex = match range.end() {
+            // Always exclusive
             Bound::Unbound => {
                 //This is not particularly nice, but what can you do...
                 let u_start: usize = start.into();
@@ -159,8 +146,8 @@ pub trait LineStorage {
                     }
                 }
                 end
-            },
-            Bound::Inclusive(i) => i.into()+1,
+            }
+            Bound::Inclusive(i) => i.into() + 1,
             Bound::Exclusive(i) => i.into(),
         };
         let urange = Range::<usize> {
@@ -171,12 +158,12 @@ pub trait LineStorage {
     }
 }
 
-struct LineStorageIterator<'a, I: 'a, L: 'a + LineStorage<Line=I>> {
+struct LineStorageIterator<'a, I: 'a, L: 'a + LineStorage<Line = I>> {
     storage: &'a L,
     range: Range<usize>,
 }
 
-impl<'a, I: 'a, L: 'a + LineStorage<Line=I>> LineStorageIterator<'a, I, L> {
+impl<'a, I: 'a, L: 'a + LineStorage<Line = I>> LineStorageIterator<'a, I, L> {
     fn new(storage: &'a L, range: Range<usize>) -> Self {
         LineStorageIterator {
             storage: storage,
@@ -184,7 +171,7 @@ impl<'a, I: 'a, L: 'a + LineStorage<Line=I>> LineStorageIterator<'a, I, L> {
         }
     }
 }
-impl<'a, I: 'a, L: 'a + LineStorage<Line=I>> Iterator for LineStorageIterator<'a, I, L> {
+impl<'a, I: 'a, L: 'a + LineStorage<Line = I>> Iterator for LineStorageIterator<'a, I, L> {
     type Item = (LineIndex, I);
     fn next(&mut self) -> Option<Self::Item> {
         if self.range.start < self.range.end {
@@ -201,7 +188,9 @@ impl<'a, I: 'a, L: 'a + LineStorage<Line=I>> Iterator for LineStorageIterator<'a
     }
 }
 
-impl<'a, I: 'a, L: 'a + LineStorage<Line=I>> DoubleEndedIterator for LineStorageIterator<'a, I, L> {
+impl<'a, I: 'a, L: 'a + LineStorage<Line = I>> DoubleEndedIterator
+    for LineStorageIterator<'a, I, L>
+{
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.range.start < self.range.end {
             let item_index = self.range.end - 1;
@@ -227,9 +216,7 @@ impl<L> MemoryLineStorage<L> {
     }
 
     pub fn with_lines(lines: Vec<L>) -> Self {
-        MemoryLineStorage {
-            lines: lines,
-        }
+        MemoryLineStorage { lines: lines }
     }
 
     pub fn num_lines_stored(&self) -> usize {
@@ -246,7 +233,6 @@ impl<L: Default> MemoryLineStorage<L> {
     }
 }
 
-
 impl<L: Clone> LineStorage for MemoryLineStorage<L> {
     type Line = L;
     fn view_line<I: Into<LineIndex>>(&self, pos: I) -> Option<L> {
@@ -262,7 +248,7 @@ impl fmt::Write for StringLineStorage {
         let mut s = s.to_owned();
 
         while let Some(newline_offset) = s.find('\n') {
-            let mut line: String = s.drain(..(newline_offset+1)).collect();
+            let mut line: String = s.drain(..(newline_offset + 1)).collect();
             line.pop(); //Remove the \n
             self.active_line_mut().push_str(&line);
             self.lines.push(String::new());
@@ -302,13 +288,18 @@ impl FileLineStorage {
         let mut reader = self.reader.borrow_mut();
 
         loop {
-            let current_max_index: usize = line_seek_positions[min(index, line_seek_positions.len()-1)];
-            reader.seek(SeekFrom::Start(current_max_index as u64)).expect("seek to line pos");
+            let current_max_index: usize =
+                line_seek_positions[min(index, line_seek_positions.len() - 1)];
+            reader
+                .seek(SeekFrom::Start(current_max_index as u64))
+                .expect("seek to line pos");
             let n_bytes = reader.read_until(b'\n', &mut buffer).expect("read line");
-            if n_bytes == 0 { //We reached EOF
+            if n_bytes == 0 {
+                //We reached EOF
                 return None;
             }
-            if index < line_seek_positions.len() { //We found the desired line
+            if index < line_seek_positions.len() {
+                //We found the desired line
                 let mut string = String::from_utf8_lossy(&buffer).into_owned();
                 if string.as_str().bytes().last().unwrap_or(b'_') == b'\n' {
                     string.pop();

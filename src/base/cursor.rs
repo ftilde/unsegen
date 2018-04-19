@@ -1,20 +1,8 @@
-use super::{
-    StyledGraphemeCluster,
-    Style,
-    StyleModifier,
-    GraphemeCluster,
-    Window,
-    Width,
-    Height,
-    RowIndex,
-    RowDiff,
-    ColIndex,
-    ColDiff,
-};
+use super::{ColDiff, ColIndex, GraphemeCluster, Height, RowDiff, RowIndex, Style, StyleModifier,
+            StyledGraphemeCluster, Width, Window};
 use std::cmp::max;
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
-
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum WrappingMode {
@@ -54,7 +42,6 @@ impl Default for CursorState {
         }
     }
 }
-
 
 pub struct Cursor<'c, 'g: 'c, T: 'c + CursorTarget = Window<'g>> {
     window: &'c mut T,
@@ -149,7 +136,9 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
     /// Move right, but skip empty clusters, also wrap to the line below if wrapping is active
     pub fn move_right(&mut self) {
         loop {
-            if self.state.wrapping_mode == WrappingMode::Wrap && self.state.x > self.window.get_width().from_origin() {
+            if self.state.wrapping_mode == WrappingMode::Wrap
+                && self.state.x > self.window.get_width().from_origin()
+            {
                 self.wrap_line();
             } else {
                 self.state.x = self.state.x + 1;
@@ -211,7 +200,8 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             self.active_style()
         };
 
-        self.write_cluster(GraphemeCluster::space(), &style).expect("Cursor should be on screen");
+        self.write_cluster(GraphemeCluster::space(), &style)
+            .expect("Cursor should be on screen");
         self.move_left();
     }
 
@@ -219,33 +209,34 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         let style = self.active_style();
         let saved_x = self.state.x;
         // FIXME: Step trait stabilization
-        for x in range.start.raw_value() .. range.end.raw_value() {
+        for x in range.start.raw_value()..range.end.raw_value() {
             let x: ColIndex = x.into();
             self.move_to_x(x);
-            self.write_cluster(GraphemeCluster::space(), &style).expect("range should be in window size");
+            self.write_cluster(GraphemeCluster::space(), &style)
+                .expect("range should be in window size");
         }
         self.state.x = saved_x;
     }
 
     pub fn clear_line_left(&mut self) {
         let end = self.state.x + 1;
-        self.clear_line_in_range(0.into() .. end);
+        self.clear_line_in_range(0.into()..end);
     }
 
     pub fn clear_line_right(&mut self) {
         let start = self.state.x;
         let end = self.window.get_soft_width().from_origin();
-        self.clear_line_in_range(start .. end);
+        self.clear_line_in_range(start..end);
     }
 
     pub fn clear_line(&mut self) {
         let end = self.window.get_soft_width().from_origin();
-        self.clear_line_in_range(0.into() .. end);
+        self.clear_line_in_range(0.into()..end);
     }
 
     pub fn fill_and_wrap_line(&mut self) {
         if self.window.get_height() == 0 {
-            return
+            return;
         }
         let w = self.window.get_soft_width().from_origin();
         while self.state.x <= 0 || self.state.x % w != 0 {
@@ -263,9 +254,10 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self.state.x = self.state.line_start_column;
     }
 
-
     fn active_style(&self) -> Style {
-        self.state.style_modifier.apply(self.window.get_default_style())
+        self.state
+            .style_modifier
+            .apply(self.window.get_default_style())
     }
 
     pub fn num_expected_wraps(&self, line: &str) -> usize {
@@ -281,7 +273,8 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
 
     fn create_tab_cluster(width: Width) -> GraphemeCluster {
         use std::iter::FromIterator;
-        let tab_string = String::from_iter(::std::iter::repeat(" ").take(width.raw_value() as usize));
+        let tab_string =
+            String::from_iter(::std::iter::repeat(" ").take(width.raw_value() as usize));
         GraphemeCluster::from_str_unchecked(tab_string)
     }
 
@@ -305,7 +298,8 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         let y = self.state.y;
         let old_target_cluster_width = {
             let target_cluster = self.get_current_cell_mut().expect("in bounds");
-            let w: Width = Width::new(target_cluster.grapheme_cluster.width() as i32).expect("width is non-negative");
+            let w: Width = Width::new(target_cluster.grapheme_cluster.width() as i32)
+                .expect("width is non-negative");
             *target_cluster = StyledGraphemeCluster::new(cluster, style);
             w
         };
@@ -315,18 +309,28 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             let mut current_width = old_target_cluster_width;
             while current_width == 0 {
                 current_x -= 1;
-                current_width = Width::new(self.window.get_cell_mut(current_x, y).expect("finding wide cluster start: read in bounds").grapheme_cluster.width() as i32).expect("width is non-negative");
+                current_width = Width::new(self.window
+                    .get_cell_mut(current_x, y)
+                    .expect("finding wide cluster start: read in bounds")
+                    .grapheme_cluster
+                    .width() as i32)
+                    .expect("width is non-negative");
             }
 
             // Clear all cells (except the newly written one)
             let start_cluster_x = current_x;
             let start_cluster_width = current_width;
-            let range: Range<i32> = start_cluster_x.into() .. (start_cluster_x+start_cluster_width).into();
+            let range: Range<i32> =
+                start_cluster_x.into()..(start_cluster_x + start_cluster_width).into();
             // FIXME: Step trait stabilization
             for x_to_clear in range {
                 let x_to_clear: ColIndex = x_to_clear.into();
                 if x_to_clear != target_cluster_x {
-                    self.window.get_cell_mut(x_to_clear, y).expect("overwrite cluster cells in bounds").grapheme_cluster.clear();
+                    self.window
+                        .get_cell_mut(x_to_clear, y)
+                        .expect("overwrite cluster cells in bounds")
+                        .grapheme_cluster
+                        .clear();
                 }
             }
         }
@@ -343,13 +347,21 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         // in pratice. If they do... we have to think of something...
     }
 
-    fn write_cluster(&mut self, grapheme_cluster: GraphemeCluster, style: &Style) -> Result<(),()> {
-        let cluster_width: Width = Width::new(grapheme_cluster.width() as i32).expect("width is non-negative");
+    fn write_cluster(
+        &mut self,
+        grapheme_cluster: GraphemeCluster,
+        style: &Style,
+    ) -> Result<(), ()> {
+        let cluster_width: Width =
+            Width::new(grapheme_cluster.width() as i32).expect("width is non-negative");
 
         let space_in_line = self.remaining_space_in_line();
         if space_in_line < cluster_width {
             // Overwrite spaces that we could not fill with our (too wide) grapheme cluster
-            for _ in 0 .. ({ let s: i32 = space_in_line.into(); s }) {
+            for _ in 0..({
+                let s: i32 = space_in_line.into();
+                s
+            }) {
                 self.write_grapheme_cluster_unchecked(GraphemeCluster::space(), style.clone());
                 self.state.x += 1;
             }
@@ -365,9 +377,14 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
                 return Err(());
             }
         }
-        if self.window.get_width().origin_range_contains(self.state.x) && self.window.get_height().origin_range_contains(self.state.y) {
+        if self.window.get_width().origin_range_contains(self.state.x)
+            && self.window.get_height().origin_range_contains(self.state.y)
+        {
             if cluster_width == 0 {
-                self.get_current_cell_mut().expect("cursor in bounds").grapheme_cluster.merge_zero_width(grapheme_cluster);
+                self.get_current_cell_mut()
+                    .expect("cursor in bounds")
+                    .grapheme_cluster
+                    .merge_zero_width(grapheme_cluster);
                 return Ok(());
             }
 
@@ -401,10 +418,18 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             return;
         }
 
-        assert!(clusters.iter().map(|s| s.grapheme_cluster.width()).sum::<usize>() == clusters.len(), "Invalid preformated cluster slice!");
+        assert!(
+            clusters
+                .iter()
+                .map(|s| s.grapheme_cluster.width())
+                .sum::<usize>() == clusters.len(),
+            "Invalid preformated cluster slice!"
+        );
 
         for cluster in clusters.iter() {
-            if self.write_cluster(cluster.grapheme_cluster.clone(), &cluster.style).is_err() {
+            if self.write_cluster(cluster.grapheme_cluster.clone(), &cluster.style)
+                .is_err()
+            {
                 break;
             }
         }
@@ -425,12 +450,12 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
                         let x = self.state.x;
                         let width = (tw - (x % tw)).try_into_positive().unwrap();
                         grapheme_cluster = Self::create_tab_cluster(width)
-                    },
+                    }
                     "\r" => {
                         self.carriage_return();
                         continue;
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
                 if self.write_cluster(grapheme_cluster, &style).is_err() {
                     break;
@@ -517,12 +542,13 @@ impl<'a, 'c: 'a, 'g: 'c, T: 'c + CursorTarget> ::std::ops::Drop for CursorRestor
     }
 }
 
-impl<'a, 'c: 'a, 'g: 'c, T: 'c + CursorTarget> ::std::ops::DerefMut for CursorRestorer<'a, 'c, 'g, T> {
+impl<'a, 'c: 'a, 'g: 'c, T: 'c + CursorTarget> ::std::ops::DerefMut
+    for CursorRestorer<'a, 'c, 'g, T>
+{
     fn deref_mut(&mut self) -> &mut Cursor<'c, 'g, T> {
         &mut self.cursor
     }
 }
-
 
 impl<'a, 'c: 'a, 'g: 'c, T: 'c + CursorTarget> ::std::ops::Deref for CursorRestorer<'a, 'c, 'g, T> {
     type Target = Cursor<'c, 'g, T>;
@@ -536,7 +562,12 @@ mod test {
     use base::test::FakeTerminal;
     use super::*;
 
-    fn test_cursor<S: Fn(&mut Cursor), F: Fn(&mut Cursor)>(window_dim: (u32, u32), after: &str, setup: S, action: F) {
+    fn test_cursor<S: Fn(&mut Cursor), F: Fn(&mut Cursor)>(
+        window_dim: (u32, u32),
+        after: &str,
+        setup: S,
+        action: F,
+    ) {
         let mut term = FakeTerminal::with_size(window_dim);
         {
             let mut window = term.create_root_window();
@@ -569,22 +600,82 @@ mod test {
 
     #[test]
     fn test_cursor_wrap() {
-        test_cursor((2, 2), "__|__", |c| c.set_wrapping_mode(WrappingMode::Wrap), |c| c.write(""));
-        test_cursor((2, 2), "t_|__", |c| c.set_wrapping_mode(WrappingMode::Wrap), |c| c.write("t"));
-        test_cursor((2, 2), "te|__", |c| c.set_wrapping_mode(WrappingMode::Wrap), |c| c.write("te"));
-        test_cursor((2, 2), "te|s_", |c| c.set_wrapping_mode(WrappingMode::Wrap), |c| c.write("tes"));
-        test_cursor((2, 2), "te|st", |c| c.set_wrapping_mode(WrappingMode::Wrap), |c| c.write("test"));
-        test_cursor((2, 2), "te|st", |c| c.set_wrapping_mode(WrappingMode::Wrap), |c| c.write("testy"));
+        test_cursor(
+            (2, 2),
+            "__|__",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write(""),
+        );
+        test_cursor(
+            (2, 2),
+            "t_|__",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write("t"),
+        );
+        test_cursor(
+            (2, 2),
+            "te|__",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write("te"),
+        );
+        test_cursor(
+            (2, 2),
+            "te|s_",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write("tes"),
+        );
+        test_cursor(
+            (2, 2),
+            "te|st",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write("test"),
+        );
+        test_cursor(
+            (2, 2),
+            "te|st",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write("testy"),
+        );
     }
 
     #[test]
     fn test_cursor_tabs() {
-        test_cursor((5, 1), "  x__", |c| c.set_tab_column_width(Width::new(2).unwrap()), |c| c.write("\tx"));
-        test_cursor((5, 1), "x x__", |c| c.set_tab_column_width(Width::new(2).unwrap()), |c| c.write("x\tx"));
-        test_cursor((5, 1), "xx  x", |c| c.set_tab_column_width(Width::new(2).unwrap()), |c| c.write("xx\tx"));
-        test_cursor((5, 1), "xxx x", |c| c.set_tab_column_width(Width::new(2).unwrap()), |c| c.write("xxx\tx"));
-        test_cursor((5, 1), "    x", |c| c.set_tab_column_width(Width::new(2).unwrap()), |c| c.write("\t\tx"));
-        test_cursor((5, 1), "     ", |c| c.set_tab_column_width(Width::new(2).unwrap()), |c| c.write("\t\t\tx"));
+        test_cursor(
+            (5, 1),
+            "  x__",
+            |c| c.set_tab_column_width(Width::new(2).unwrap()),
+            |c| c.write("\tx"),
+        );
+        test_cursor(
+            (5, 1),
+            "x x__",
+            |c| c.set_tab_column_width(Width::new(2).unwrap()),
+            |c| c.write("x\tx"),
+        );
+        test_cursor(
+            (5, 1),
+            "xx  x",
+            |c| c.set_tab_column_width(Width::new(2).unwrap()),
+            |c| c.write("xx\tx"),
+        );
+        test_cursor(
+            (5, 1),
+            "xxx x",
+            |c| c.set_tab_column_width(Width::new(2).unwrap()),
+            |c| c.write("xxx\tx"),
+        );
+        test_cursor(
+            (5, 1),
+            "    x",
+            |c| c.set_tab_column_width(Width::new(2).unwrap()),
+            |c| c.write("\t\tx"),
+        );
+        test_cursor(
+            (5, 1),
+            "     ",
+            |c| c.set_tab_column_width(Width::new(2).unwrap()),
+            |c| c.write("\t\t\tx"),
+        );
     }
 
     #[test]
@@ -593,25 +684,121 @@ mod test {
         test_cursor((5, 1), "沐沐_", |_| {}, |c| c.write("沐沐"));
         test_cursor((5, 1), "沐沐 ", |_| {}, |c| c.write("沐沐沐"));
 
-        test_cursor((3, 2), "沐_|___", |c| c.set_wrapping_mode(WrappingMode::Wrap), |c| c.write("沐"));
-        test_cursor((3, 2), "沐 |沐_", |c| c.set_wrapping_mode(WrappingMode::Wrap), |c| c.write("沐沐"));
-        test_cursor((3, 2), "沐 |沐 ", |c| c.set_wrapping_mode(WrappingMode::Wrap), |c| c.write("沐沐沐"));
+        test_cursor(
+            (3, 2),
+            "沐_|___",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write("沐"),
+        );
+        test_cursor(
+            (3, 2),
+            "沐 |沐_",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write("沐沐"),
+        );
+        test_cursor(
+            (3, 2),
+            "沐 |沐 ",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write("沐沐沐"),
+        );
     }
 
     #[test]
     fn test_cursor_wide_cluster_overwrite() {
-        test_cursor((5, 1), "X ___", |_| {}, |c| { c.write("沐"); c.set_position(ColIndex::new(0),RowIndex::new(0)); c.write("X"); });
-        test_cursor((5, 1), " X___", |_| {}, |c| { c.write("沐"); c.set_position(ColIndex::new(1),RowIndex::new(0)); c.write("X"); });
-        test_cursor((5, 1), "XYZ _", |_| {}, |c| { c.write("沐沐"); c.set_position(ColIndex::new(0),RowIndex::new(0)); c.write("XYZ"); });
-        test_cursor((5, 1), " XYZ_", |_| {}, |c| { c.write("沐沐"); c.set_position(ColIndex::new(1),RowIndex::new(0)); c.write("XYZ"); });
-        test_cursor((5, 1), "沐XYZ", |_| {}, |c| { c.write("沐沐沐"); c.set_position(ColIndex::new(2),RowIndex::new(0)); c.write("XYZ"); });
+        test_cursor(
+            (5, 1),
+            "X ___",
+            |_| {},
+            |c| {
+                c.write("沐");
+                c.set_position(ColIndex::new(0), RowIndex::new(0));
+                c.write("X");
+            },
+        );
+        test_cursor(
+            (5, 1),
+            " X___",
+            |_| {},
+            |c| {
+                c.write("沐");
+                c.set_position(ColIndex::new(1), RowIndex::new(0));
+                c.write("X");
+            },
+        );
+        test_cursor(
+            (5, 1),
+            "XYZ _",
+            |_| {},
+            |c| {
+                c.write("沐沐");
+                c.set_position(ColIndex::new(0), RowIndex::new(0));
+                c.write("XYZ");
+            },
+        );
+        test_cursor(
+            (5, 1),
+            " XYZ_",
+            |_| {},
+            |c| {
+                c.write("沐沐");
+                c.set_position(ColIndex::new(1), RowIndex::new(0));
+                c.write("XYZ");
+            },
+        );
+        test_cursor(
+            (5, 1),
+            "沐XYZ",
+            |_| {},
+            |c| {
+                c.write("沐沐沐");
+                c.set_position(ColIndex::new(2), RowIndex::new(0));
+                c.write("XYZ");
+            },
+        );
     }
 
     #[test]
     fn test_cursor_tabs_overwrite() {
-        test_cursor((5, 1), "X   _", |c| c.set_tab_column_width(Width::new(4).unwrap()), |c| { c.write("\t"); c.set_position(ColIndex::new(0),RowIndex::new(0)); c.write("X"); });
-        test_cursor((5, 1), " X  _", |c| c.set_tab_column_width(Width::new(4).unwrap()), |c| { c.write("\t"); c.set_position(ColIndex::new(1),RowIndex::new(0)); c.write("X"); });
-        test_cursor((5, 1), "  X _", |c| c.set_tab_column_width(Width::new(4).unwrap()), |c| { c.write("\t"); c.set_position(ColIndex::new(2),RowIndex::new(0)); c.write("X"); });
-        test_cursor((5, 1), "   X_", |c| c.set_tab_column_width(Width::new(4).unwrap()), |c| { c.write("\t"); c.set_position(ColIndex::new(3),RowIndex::new(0)); c.write("X"); });
+        test_cursor(
+            (5, 1),
+            "X   _",
+            |c| c.set_tab_column_width(Width::new(4).unwrap()),
+            |c| {
+                c.write("\t");
+                c.set_position(ColIndex::new(0), RowIndex::new(0));
+                c.write("X");
+            },
+        );
+        test_cursor(
+            (5, 1),
+            " X  _",
+            |c| c.set_tab_column_width(Width::new(4).unwrap()),
+            |c| {
+                c.write("\t");
+                c.set_position(ColIndex::new(1), RowIndex::new(0));
+                c.write("X");
+            },
+        );
+        test_cursor(
+            (5, 1),
+            "  X _",
+            |c| c.set_tab_column_width(Width::new(4).unwrap()),
+            |c| {
+                c.write("\t");
+                c.set_position(ColIndex::new(2), RowIndex::new(0));
+                c.write("X");
+            },
+        );
+        test_cursor(
+            (5, 1),
+            "   X_",
+            |c| c.set_tab_column_width(Width::new(4).unwrap()),
+            |c| {
+                c.write("\t");
+                c.set_position(ColIndex::new(3), RowIndex::new(0));
+                c.write("X");
+            },
+        );
     }
 }

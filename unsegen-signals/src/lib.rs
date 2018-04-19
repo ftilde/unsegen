@@ -1,18 +1,9 @@
 extern crate libc;
 extern crate unsegen;
 
-use unsegen::input::{
-    Behavior,
-    Input,
-    Event,
-    Key,
-    ToEvent,
-};
+use unsegen::input::{Behavior, Event, Input, Key, ToEvent};
 
-use libc::{
-    kill,
-    getpid,
-};
+use libc::{getpid, kill};
 
 use std::collections::HashMap;
 
@@ -55,7 +46,7 @@ impl Signal for SIGQUIT {
 }
 
 // Passes all inputs through to the modelled terminal
-pub struct SignalBehavior{
+pub struct SignalBehavior {
     mapping: HashMap<Event, CSig>,
 }
 
@@ -79,7 +70,9 @@ impl SignalBehavior {
 impl<'a> Behavior for SignalBehavior {
     fn input(self, i: Input) -> Option<Input> {
         if let Some(sig) = self.mapping.get(&i.event) {
-            unsafe { kill(getpid(), *sig); }
+            unsafe {
+                kill(getpid(), *sig);
+            }
             None
         } else {
             Some(i)

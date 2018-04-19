@@ -4,7 +4,7 @@
 extern crate libc;
 
 #[link(name = "c")]
-extern {
+extern "C" {
     pub fn posix_openpt(flags: libc::c_int) -> libc::c_int;
     pub fn grantpt(fd: libc::c_int) -> libc::c_int;
     pub fn unlockpt(fd: libc::c_int) -> libc::c_int;

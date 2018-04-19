@@ -1,22 +1,8 @@
-use super::super::{
-    Demand,
-    Demand2D,
-    LineIndex,
-    LineStorage,
-    MemoryLineStorage,
-    RenderingHints,
-    Widget,
-};
+use super::super::{Demand, Demand2D, LineIndex, LineStorage, MemoryLineStorage, RenderingHints,
+                   Widget};
 use base::basic_types::*;
-use base::{
-    Cursor,
-    Window,
-    WrappingMode,
-};
-use input::{
-    Scrollable,
-    OperationResult,
-};
+use base::{Cursor, Window, WrappingMode};
+use input::{OperationResult, Scrollable};
 
 pub struct LogViewer {
     pub storage: MemoryLineStorage<String>,
@@ -34,7 +20,8 @@ impl LogViewer {
     }
 
     fn current_line(&self) -> usize {
-        self.scrollback_position.unwrap_or(self.storage.num_lines_stored().checked_sub(1).unwrap_or(0))
+        self.scrollback_position
+            .unwrap_or(self.storage.num_lines_stored().checked_sub(1).unwrap_or(0))
     }
 }
 
@@ -42,7 +29,7 @@ impl Widget for LogViewer {
     fn space_demand(&self) -> Demand2D {
         Demand2D {
             width: Demand::at_least(1),
-            height: Demand::at_least(1)
+            height: Demand::at_least(1),
         }
     }
     fn draw(&self, mut window: Window, _: RenderingHints) {
@@ -61,11 +48,11 @@ impl Widget for LogViewer {
             .wrapping_mode(WrappingMode::Wrap);
         let end_line = LineIndex(self.current_line());
         let start_line = LineIndex(end_line.0.checked_sub(height.into()).unwrap_or(0));
-        for (_, line) in self.storage.view(start_line..(end_line+1)).rev() {
+        for (_, line) in self.storage.view(start_line..(end_line + 1)).rev() {
             let num_auto_wraps = cursor.num_expected_wraps(&line) as i32;
             cursor.move_by(ColDiff::new(0), RowDiff::new(-num_auto_wraps));
             cursor.writeln(&line);
-            cursor.move_by(ColDiff::new(0), RowDiff::new(-num_auto_wraps)-2);
+            cursor.move_by(ColDiff::new(0), RowDiff::new(-num_auto_wraps) - 2);
         }
     }
 }
@@ -87,11 +74,7 @@ impl Scrollable for LogViewer {
     }
     fn scroll_backwards(&mut self) -> OperationResult {
         let current = self.current_line();
-        let op_res = if current != 0 {
-            Ok(())
-        } else {
-            Err(())
-        };
+        let op_res = if current != 0 { Ok(()) } else { Err(()) };
         self.scrollback_position = Some(current.checked_sub(self.scroll_step).unwrap_or(0));
         op_res
     }

@@ -1,7 +1,4 @@
-use unicode_segmentation::{
-    UnicodeSegmentation,
-    Graphemes,
-};
+use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 use smallvec::SmallVec;
 use std::str::FromStr;
 
@@ -14,16 +11,12 @@ pub struct GraphemeCluster {
 impl GraphemeCluster {
     pub fn as_str<'a>(&'a self) -> &'a str {
         // This is safe because bytes is always valid utf8.
-        unsafe {
-            ::std::str::from_utf8_unchecked(&self.bytes)
-        }
+        unsafe { ::std::str::from_utf8_unchecked(&self.bytes) }
     }
 
     fn from_bytes(slice: &[u8]) -> Self {
         let vec = SmallVec::from_slice(slice);
-        GraphemeCluster {
-            bytes: vec,
-        }
+        GraphemeCluster { bytes: vec }
     }
 
     pub(in base) fn from_str_unchecked<S: AsRef<str>>(string: S) -> Self {
@@ -77,8 +70,7 @@ impl<'a> Iterator for GraphemeClusterIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.graphemes.next().map(|s|
             // We trust the implementation of unicode_segmentation
-            GraphemeCluster::from_str_unchecked(s)
-        )
+            GraphemeCluster::from_str_unchecked(s))
     }
 }
 
@@ -106,7 +98,9 @@ impl FromStr for GraphemeCluster {
     type Err = GraphemeClusterError;
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let mut clusters = GraphemeCluster::all_from_str(text);
-        let res = clusters.next().ok_or(GraphemeClusterError::NoGraphemeCluster);
+        let res = clusters
+            .next()
+            .ok_or(GraphemeClusterError::NoGraphemeCluster);
         if clusters.next().is_none() {
             res
         } else {

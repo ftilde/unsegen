@@ -1,23 +1,12 @@
-use std::cmp::{
-    Ordering,
-};
-use std::ops:: {
-    Add,
-    AddAssign,
-    Sub,
-    SubAssign,
-    Mul,
-    Div,
-    Rem,
-    Neg,
-};
+use std::cmp::Ordering;
+use std::ops::{Add, AddAssign, Div, Mul, Neg, Rem, Sub, SubAssign};
 use std::marker::PhantomData;
 use std::iter::Sum;
 
 /// AxisIndex (the base for ColIndex or RowIndex) is a signed integer coordinate (i.e., a
 /// coordinate of a point on the terminal cell grid)
 #[derive(Copy, Clone, Debug, Ord, Eq)]
-pub struct AxisIndex<T: AxisDimension>{
+pub struct AxisIndex<T: AxisDimension> {
     val: i32,
     _dim: PhantomData<T>,
 }
@@ -284,11 +273,10 @@ impl<T: AxisDimension> Neg for AxisDiff<T> {
     }
 }
 
-
 /// PositiveAxisDiff (the base for Width or Height) specifies a non-negative (or absolute)
 /// difference  between two coordinate points on a terminal grid.
 #[derive(Copy, Clone, Debug, Ord, Eq)]
-pub struct PositiveAxisDiff<T: AxisDimension>{
+pub struct PositiveAxisDiff<T: AxisDimension> {
     val: i32,
     _dim: PhantomData<T>,
 }
@@ -323,7 +311,7 @@ impl<T: AxisDimension> PositiveAxisDiff<T> {
     /// assert!(Width::new(0).is_ok());
     /// assert!(Width::new(-37).is_err());
     /// ```
-    pub fn new(v: i32) -> Result<Self,()> {
+    pub fn new(v: i32) -> Result<Self, ()> {
         if v >= 0 {
             Ok(PositiveAxisDiff {
                 val: v,
@@ -456,35 +444,39 @@ impl<T: AxisDimension, I: Into<AxisDiff<T>> + Copy> PartialOrd<I> for PositiveAx
     }
 }
 impl<T: AxisDimension + PartialOrd + Ord> Sum for PositiveAxisDiff<T> {
-    fn sum<I>(iter: I) -> Self where I: Iterator<Item=Self> {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Self>,
+    {
         iter.fold(PositiveAxisDiff::new_unchecked(0), PositiveAxisDiff::add)
     }
 }
 impl<T: AxisDimension> From<usize> for PositiveAxisDiff<T> {
     fn from(v: usize) -> Self {
-        assert!(v < i32::max_value() as usize, "Invalid PositiveAxisDiff value");
+        assert!(
+            v < i32::max_value() as usize,
+            "Invalid PositiveAxisDiff value"
+        );
         PositiveAxisDiff::new_unchecked(v as i32)
     }
 }
-
 
 /// ----------------------------------------------------------------------------
 /// Concrete types for concrete dimensions --------------------------------------
 /// ----------------------------------------------------------------------------
 
 /// Trait for all dimensions of a terminal grid. See RowDimension and ColDimension.
-pub trait AxisDimension : Copy { }
+pub trait AxisDimension: Copy {}
 
 /// The horizontal (i.e., x-) dimension of a terminal grid. See ColIndex, ColDiff, and Width.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ColDimension;
-impl AxisDimension for ColDimension { }
+impl AxisDimension for ColDimension {}
 
 /// The vertical (i.e., y-) dimension of a terminal grid. See RowIndex, RowDiff and Height.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RowDimension;
-impl AxisDimension for RowDimension { }
-
+impl AxisDimension for RowDimension {}
 
 /// An AxisIndex in x-dimension.
 pub type ColIndex = AxisIndex<ColDimension>;
@@ -494,7 +486,6 @@ pub type ColDiff = AxisDiff<ColDimension>;
 
 /// A PositiveAxisDiff in x-dimension.
 pub type Width = PositiveAxisDiff<ColDimension>;
-
 
 /// An AxisIndex in y-dimension.
 pub type RowIndex = AxisIndex<RowDimension>;

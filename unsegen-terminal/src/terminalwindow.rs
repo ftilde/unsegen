@@ -1,41 +1,15 @@
 use unsegen::base::basic_types::*;
-use unsegen::base::{
-    Cursor,
-    CursorState,
-    CursorTarget,
-    ModifyMode,
-    Style,
-    StyleModifier,
-    StyledGraphemeCluster,
-    Window,
-    WrappingMode,
-    UNBOUNDED_WIDTH,
-    UNBOUNDED_HEIGHT,
-};
+use unsegen::base::{Cursor, CursorState, CursorTarget, ModifyMode, Style, StyleModifier,
+                    StyledGraphemeCluster, Window, WrappingMode, UNBOUNDED_HEIGHT, UNBOUNDED_WIDTH};
 use unsegen::base::Color as UColor;
-use unsegen::widget::{
-    Demand,
-    Demand2D,
-    RenderingHints,
-};
-use unsegen::input::{
-    Scrollable,
-    OperationResult,
-};
+use unsegen::widget::{Demand, Demand2D, RenderingHints};
+use unsegen::input::{OperationResult, Scrollable};
 use ansi;
-use ansi::{
-    Attr,
-    CursorStyle,
-    Handler,
-    TermInfo,
-};
+use ansi::{Attr, CursorStyle, Handler, TermInfo};
 
 use std::fmt::Write;
 use index;
-use std::cmp::{
-    min,
-    max,
-};
+use std::cmp::{max, min};
 
 #[derive(Clone)]
 struct Line {
@@ -62,26 +36,30 @@ impl Line {
         if width == 0 {
             Height::new(1).unwrap()
         } else {
-            Height::new(self.length().checked_sub(1).unwrap_or(0) as i32 / width.raw_value() + 1).unwrap()
+            Height::new(self.length().checked_sub(1).unwrap_or(0) as i32 / width.raw_value() + 1)
+                .unwrap()
         }
     }
 
     fn get_cell_mut(&mut self, x: ColIndex) -> Option<&mut StyledGraphemeCluster> {
         if x < 0 {
-            return None
+            return None;
         }
         let x = x.raw_value() as usize;
         // Grow horizontally to desired position
         let missing_elements = (x + 1).checked_sub(self.content.len()).unwrap_or(0);
-        self.content.extend(::std::iter::repeat(StyledGraphemeCluster::default()).take(missing_elements));
+        self.content
+            .extend(::std::iter::repeat(StyledGraphemeCluster::default()).take(missing_elements));
 
-        let element = self.content.get_mut(x).expect("element existent assured previously");
+        let element = self.content
+            .get_mut(x)
+            .expect("element existent assured previously");
         Some(element)
     }
 
     fn get_cell(&self, x: ColIndex) -> Option<&StyledGraphemeCluster> {
         if x < 0 {
-            return None
+            return None;
         }
         /*
         //TODO: maybe we want to grow? problems with mutability...
@@ -90,7 +68,9 @@ impl Line {
         self.content.extend(::std::iter::repeat(StyledGraphemeCluster::default()).take(missing_elements));
         */
 
-        let element = self.content.get(x.raw_value() as usize).expect("element existent assured previously");
+        let element = self.content
+            .get(x.raw_value() as usize)
+            .expect("element existent assured previously");
         Some(element)
     }
 }
@@ -110,7 +90,10 @@ impl LineBuffer {
     }
 
     fn height_as_displayed(&self) -> Height {
-        self.lines.iter().map(|l| l.height_for_width(self.window_width)).sum()
+        self.lines
+            .iter()
+            .map(|l| l.height_for_width(self.window_width))
+            .sum()
     }
 
     pub fn set_window_width(&mut self, w: Width) {
@@ -130,14 +113,17 @@ impl CursorTarget for LineBuffer {
     }
     fn get_cell_mut(&mut self, x: ColIndex, y: RowIndex) -> Option<&mut StyledGraphemeCluster> {
         if y < 0 {
-            return None
+            return None;
         }
         let y = y.raw_value() as usize;
         // Grow vertically to desired position
-        let missing_elements = (y+1).checked_sub(self.lines.len()).unwrap_or(0);
-        self.lines.extend(::std::iter::repeat(Line::empty()).take(missing_elements));
+        let missing_elements = (y + 1).checked_sub(self.lines.len()).unwrap_or(0);
+        self.lines
+            .extend(::std::iter::repeat(Line::empty()).take(missing_elements));
 
-        let line = self.lines.get_mut(y).expect("line existence assured previously");
+        let line = self.lines
+            .get_mut(y)
+            .expect("line existence assured previously");
 
         line.get_cell_mut(x)
     }
@@ -153,7 +139,9 @@ impl CursorTarget for LineBuffer {
             return None;
         }
 
-        let line = self.lines.get(y.raw_value() as usize).expect("line existence assured previously");
+        let line = self.lines
+            .get(y.raw_value() as usize)
+            .expect("line existence assured previously");
 
         line.get_cell(x)
     }
@@ -176,7 +164,7 @@ pub struct TerminalWindow {
 
 impl TerminalWindow {
     pub fn new() -> Self {
-        TerminalWindow  {
+        TerminalWindow {
             window_width: Width::new(0).unwrap(),
             window_height: Height::new(0).unwrap(),
             buffer: LineBuffer::new(),
@@ -190,7 +178,8 @@ impl TerminalWindow {
 
     // position of the first (displayed) row of the buffer that will NOT be displayed
     fn current_scrollback_pos(&self) -> RowIndex {
-        self.scrollback_position.unwrap_or(self.buffer.height_as_displayed().from_origin())
+        self.scrollback_position
+            .unwrap_or(self.buffer.height_as_displayed().from_origin())
     }
 
     pub fn set_width(&mut self, w: Width) {
@@ -219,7 +208,12 @@ impl TerminalWindow {
     }
 
     fn line_to_buffer_pos_y(&self, line: index::Line) -> RowIndex {
-        RowIndex::new(max(0, self.buffer.lines.len() as i32 - self.window_height.raw_value()) + line.0 as i32)
+        RowIndex::new(
+            max(
+                0,
+                self.buffer.lines.len() as i32 - self.window_height.raw_value(),
+            ) + line.0 as i32,
+        )
     }
     fn col_to_buffer_pos_x(&self, col: index::Column) -> ColIndex {
         ColIndex::new(col.0 as i32)
@@ -240,7 +234,9 @@ impl TerminalWindow {
         if self.show_cursor {
             self.with_cursor(|cursor| {
                 if let Some(cell) = cursor.get_current_cell_mut() {
-                    StyleModifier::new().invert(ModifyMode::Toggle).modify(&mut cell.style);
+                    StyleModifier::new()
+                        .invert(ModifyMode::Toggle)
+                        .modify(&mut cell.style);
                 }
             });
         }
@@ -252,11 +248,23 @@ impl TerminalWindow {
             return;
         }
 
-        let scrollback_offset = -(self.current_scrollback_pos() - self.buffer.height_as_displayed());
+        let scrollback_offset =
+            -(self.current_scrollback_pos() - self.buffer.height_as_displayed());
         let minimum_y_start = scrollback_offset + height;
-        let start_line = self.buffer.lines.len().checked_sub(minimum_y_start.raw_value() as usize).unwrap_or(0);
+        let start_line = self.buffer
+            .lines
+            .len()
+            .checked_sub(minimum_y_start.raw_value() as usize)
+            .unwrap_or(0);
         let line_range = start_line..;
-        let y_start: RowIndex = min(RowIndex::new(0), minimum_y_start - self.buffer.lines[line_range.clone()].iter().map(|line| line.height_for_width(width)).sum::<Height>());
+        let y_start: RowIndex = min(
+            RowIndex::new(0),
+            minimum_y_start
+                - self.buffer.lines[line_range.clone()]
+                    .iter()
+                    .map(|line| line.height_for_width(width))
+                    .sum::<Height>(),
+        );
         let mut cursor = Cursor::new(&mut window)
             .position(ColIndex::new(0), y_start)
             .wrapping_mode(WrappingMode::Wrap);
@@ -269,7 +277,9 @@ impl TerminalWindow {
         if self.show_cursor {
             self.with_cursor(|cursor| {
                 if let Some(cell) = cursor.get_current_cell_mut() {
-                    StyleModifier::new().invert(ModifyMode::Toggle).modify(&mut cell.style);
+                    StyleModifier::new()
+                        .invert(ModifyMode::Toggle)
+                        .modify(&mut cell.style);
                 }
             });
         }
@@ -297,14 +307,14 @@ fn ansi_to_unsegen_color(ansi_color: ansi::Color) -> UColor {
             ansi::NamedColor::BrightWhite => UColor::LightWhite,
             ansi::NamedColor::Foreground => UColor::White, //??
             ansi::NamedColor::Background => UColor::Black, //??
-            ansi::NamedColor::CursorText =>  {
+            ansi::NamedColor::CursorText => {
                 // This is kind of tricky to get...
                 UColor::Black
-            },
+            }
             ansi::NamedColor::Cursor => {
                 // This is kind of tricky to get...
                 UColor::Black
-            },
+            }
             // Also not sure what to do here
             ansi::NamedColor::DimBlack => UColor::Black,
             ansi::NamedColor::DimRed => UColor::Red,
@@ -315,14 +325,16 @@ fn ansi_to_unsegen_color(ansi_color: ansi::Color) -> UColor {
             ansi::NamedColor::DimCyan => UColor::Cyan,
             ansi::NamedColor::DimWhite => UColor::White,
         },
-        ansi::Color::Spec(c) => {
-            UColor::Rgb{r: c.r, g: c.g, b: c.b}
+        ansi::Color::Spec(c) => UColor::Rgb {
+            r: c.r,
+            g: c.g,
+            b: c.b,
         },
         ansi::Color::Indexed(c) => {
             //TODO: We might in the future implement a separate color table, but for new we "reuse"
             //the table of the underlying terminal:
             UColor::Ansi(c)
-        },
+        }
     }
 }
 
@@ -345,9 +357,7 @@ macro_rules! trace_ansi {
     }}
 }
 
-
 impl Handler for TerminalWindow {
-
     /// OSC to set window title
     fn set_title(&mut self, _: &str) {
         //TODO: (Although this might not make sense to implement. Do we want to display a title?)
@@ -483,9 +493,7 @@ impl Handler for TerminalWindow {
 
     /// Carriage return
     fn carriage_return(&mut self) {
-        self.with_cursor(|cursor| {
-            cursor.carriage_return()
-        });
+        self.with_cursor(|cursor| cursor.carriage_return());
         trace_ansi!("carriage_return");
     }
 
@@ -592,17 +600,15 @@ impl Handler for TerminalWindow {
 
     /// Clear current line
     fn clear_line(&mut self, mode: ansi::LineClearMode) {
-        self.with_cursor(|cursor| {
-            match mode {
-                ansi::LineClearMode::Right => {
-                    cursor.clear_line_right();
-                },
-                ansi::LineClearMode::Left => {
-                    cursor.clear_line_left();
-                },
-                ansi::LineClearMode::All => {
-                    cursor.clear_line();
-                },
+        self.with_cursor(|cursor| match mode {
+            ansi::LineClearMode::Right => {
+                cursor.clear_line_right();
+            }
+            ansi::LineClearMode::Left => {
+                cursor.clear_line_left();
+            }
+            ansi::LineClearMode::All => {
+                cursor.clear_line();
             }
         });
     }
@@ -614,12 +620,12 @@ impl Handler for TerminalWindow {
                 trace_ansi!("clear_screen below");
                 let mut range_start = 0;
                 self.with_cursor(|cursor| {
-                    range_start = max(0, cursor.get_pos_y().raw_value()+1) as usize
+                    range_start = max(0, cursor.get_pos_y().raw_value() + 1) as usize
                 });
 
                 self.clear_line(ansi::LineClearMode::Right);
-                range_start .. self.buffer.lines.len()
-            },
+                range_start..self.buffer.lines.len()
+            }
             ansi::ClearMode::Above => {
                 trace_ansi!("clear_screen above");
                 let mut range_end = ::std::usize::MAX;
@@ -627,16 +633,24 @@ impl Handler for TerminalWindow {
                     range_end = max(0, cursor.get_pos_y().raw_value()) as usize
                 });
                 self.clear_line(ansi::LineClearMode::Left);
-                self.buffer.lines.len().checked_sub(self.window_height.into()).unwrap_or(0) .. range_end
-            },
+                self.buffer
+                    .lines
+                    .len()
+                    .checked_sub(self.window_height.into())
+                    .unwrap_or(0)..range_end
+            }
             ansi::ClearMode::All => {
                 trace_ansi!("clear_screen all");
-                self.buffer.lines.len().checked_sub(self.window_height.into()).unwrap_or(0) .. self.buffer.lines.len()
-            },
+                self.buffer
+                    .lines
+                    .len()
+                    .checked_sub(self.window_height.into())
+                    .unwrap_or(0)..self.buffer.lines.len()
+            }
             ansi::ClearMode::Saved => {
                 warn_unimplemented!("clear_screen saved");
                 return;
-            },
+            }
         };
         for line in self.buffer.lines[clear_range].iter_mut() {
             line.clear();
@@ -669,26 +683,56 @@ impl Handler for TerminalWindow {
     fn terminal_attribute(&mut self, attr: Attr) {
         self.with_cursor(|c| {
             match attr {
-                Attr::Reset => { c.set_style_modifier(StyleModifier::new()) },
-                Attr::Bold => { c.apply_style_modifier(StyleModifier::new().bold(true)); },
-                Attr::Dim => { /* What is this? */ warn_unimplemented!("attr Dim") },
-                Attr::Italic => { c.apply_style_modifier(StyleModifier::new().italic(true)); },
-                Attr::Underscore => { c.apply_style_modifier(StyleModifier::new().underline(true)); },
-                Attr::BlinkSlow => { warn_unimplemented!("attr BlinkSlow") },
-                Attr::BlinkFast => { warn_unimplemented!("attr BlinkFast") },
-                Attr::Reverse => { c.apply_style_modifier(StyleModifier::new().invert(true)); },
-                Attr::Hidden => { warn_unimplemented!("attr Hidden") },
-                Attr::Strike => { warn_unimplemented!("attr Strike") },
-                Attr::CancelBold => { c.apply_style_modifier(StyleModifier::new().bold(false)); },
-                Attr::CancelBoldDim => { /*??*/c.apply_style_modifier(StyleModifier::new().bold(false)); },
-                Attr::CancelItalic => { c.apply_style_modifier(StyleModifier::new().italic(false)); },
-                Attr::CancelUnderline => { c.apply_style_modifier(StyleModifier::new().underline(false)); },
-                Attr::CancelBlink => { warn_unimplemented!("attr CancelBlink") },
-                Attr::CancelReverse => { c.apply_style_modifier(StyleModifier::new().invert(false)); },
-                Attr::CancelHidden => { warn_unimplemented!("attr CancelHidden") },
-                Attr::CancelStrike => { warn_unimplemented!("attr CancelStrike") },
-                Attr::Foreground(color) => { c.apply_style_modifier(StyleModifier::new().fg_color(ansi_to_unsegen_color(color))); },
-                Attr::Background(color) => { c.apply_style_modifier(StyleModifier::new().bg_color(ansi_to_unsegen_color(color))); },
+                Attr::Reset => c.set_style_modifier(StyleModifier::new()),
+                Attr::Bold => {
+                    c.apply_style_modifier(StyleModifier::new().bold(true));
+                }
+                Attr::Dim => {
+                    /* What is this? */
+                    warn_unimplemented!("attr Dim")
+                }
+                Attr::Italic => {
+                    c.apply_style_modifier(StyleModifier::new().italic(true));
+                }
+                Attr::Underscore => {
+                    c.apply_style_modifier(StyleModifier::new().underline(true));
+                }
+                Attr::BlinkSlow => warn_unimplemented!("attr BlinkSlow"),
+                Attr::BlinkFast => warn_unimplemented!("attr BlinkFast"),
+                Attr::Reverse => {
+                    c.apply_style_modifier(StyleModifier::new().invert(true));
+                }
+                Attr::Hidden => warn_unimplemented!("attr Hidden"),
+                Attr::Strike => warn_unimplemented!("attr Strike"),
+                Attr::CancelBold => {
+                    c.apply_style_modifier(StyleModifier::new().bold(false));
+                }
+                Attr::CancelBoldDim => {
+                    /*??*/
+                    c.apply_style_modifier(StyleModifier::new().bold(false));
+                }
+                Attr::CancelItalic => {
+                    c.apply_style_modifier(StyleModifier::new().italic(false));
+                }
+                Attr::CancelUnderline => {
+                    c.apply_style_modifier(StyleModifier::new().underline(false));
+                }
+                Attr::CancelBlink => warn_unimplemented!("attr CancelBlink"),
+                Attr::CancelReverse => {
+                    c.apply_style_modifier(StyleModifier::new().invert(false));
+                }
+                Attr::CancelHidden => warn_unimplemented!("attr CancelHidden"),
+                Attr::CancelStrike => warn_unimplemented!("attr CancelStrike"),
+                Attr::Foreground(color) => {
+                    c.apply_style_modifier(
+                        StyleModifier::new().fg_color(ansi_to_unsegen_color(color)),
+                    );
+                }
+                Attr::Background(color) => {
+                    c.apply_style_modifier(
+                        StyleModifier::new().bg_color(ansi_to_unsegen_color(color)),
+                    );
+                }
             }
         });
         trace_ansi!("terminal_attribute {:?}", attr);
@@ -700,8 +744,10 @@ impl Handler for TerminalWindow {
             ansi::Mode::ShowCursor => {
                 self.show_cursor = true;
                 trace_ansi!("set_mode {:?}", mode);
-            },
-            _ => { warn_unimplemented!("set_mode {:?}", mode); },
+            }
+            _ => {
+                warn_unimplemented!("set_mode {:?}", mode);
+            }
         }
     }
 
@@ -711,8 +757,10 @@ impl Handler for TerminalWindow {
             ansi::Mode::ShowCursor => {
                 self.show_cursor = false;
                 trace_ansi!("set_mode {:?}", mode);
-            },
-            _ => { warn_unimplemented!("set_mode {:?}", mode); },
+            }
+            _ => {
+                warn_unimplemented!("set_mode {:?}", mode);
+            }
         }
     }
 
@@ -829,11 +877,13 @@ impl TerminalWindow {
 mod test {
     use unsegen::base::terminal::test::FakeTerminal;
     use super::*;
-    use unsegen::base::{
-        GraphemeCluster,
-    };
+    use unsegen::base::GraphemeCluster;
 
-    fn test_terminal_window<F: Fn(&mut TerminalWindow)>(window_dim: (u32, u32), after: &str, action: F) {
+    fn test_terminal_window<F: Fn(&mut TerminalWindow)>(
+        window_dim: (u32, u32),
+        after: &str,
+        action: F,
+    ) {
         let mut term = FakeTerminal::with_size(window_dim);
         {
             let mut window = term.create_root_window();

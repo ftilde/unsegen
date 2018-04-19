@@ -1,9 +1,4 @@
-use std::ops::{
-    Range,
-    RangeFrom,
-    RangeFull,
-    RangeTo,
-};
+use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
 //TODO: Move to std traits and types once they are stabilized: https://github.com/rust-lang/rust/issues/30877
 pub enum Bound<T> {
@@ -48,4 +43,3 @@ impl<T> RangeArgument<T> for RangeFull {
         Bound::Unbound
     }
 }
-

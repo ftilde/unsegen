@@ -1,4 +1,4 @@
-pub use termion::event::{Event, Key, MouseEvent, MouseButton};
+pub use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{EventsAndRaw, TermReadEventsAndRaw};
 use std::collections::HashSet;
 
@@ -12,7 +12,12 @@ impl<R: io::Read> Iterator for InputIter<R> {
     type Item = Result<Input, io::Error>;
 
     fn next(&mut self) -> Option<Result<Input, io::Error>> {
-        self.inner.next().map(|tuple| tuple.map(|(event, raw)| Input { event: event, raw: raw }))
+        self.inner.next().map(|tuple| {
+            tuple.map(|(event, raw)| Input {
+                event: event,
+                raw: raw,
+            })
+        })
     }
 }
 
@@ -25,14 +30,12 @@ pub struct Input {
 impl Input {
     pub fn real_all<R: io::Read>(read: R) -> InputIter<R> {
         InputIter {
-            inner: read.events_and_raw()
+            inner: read.events_and_raw(),
         }
     }
 
     pub fn chain<B: Behavior>(self, behavior: B) -> InputChain {
-        let chain_begin = InputChain {
-            input: Some(self),
-        };
+        let chain_begin = InputChain { input: Some(self) };
         chain_begin.chain(behavior)
     }
 
@@ -52,9 +55,7 @@ impl InputChain {
                 input: behavior.input(event),
             }
         } else {
-            InputChain {
-                input: None,
-            }
+            InputChain { input: None }
         }
     }
 
@@ -107,7 +108,7 @@ pub trait Behavior {
     fn input(self, Input) -> Option<Input>;
 }
 
-impl<F: FnOnce(Input)->Option<Input>> Behavior for F {
+impl<F: FnOnce(Input) -> Option<Input>> Behavior for F {
     fn input(self, input: Input) -> Option<Input> {
         self(input)
     }
@@ -193,17 +194,17 @@ pub trait Scrollable {
     fn scroll_forwards(&mut self) -> OperationResult;
     fn scroll_to_beginning(&mut self) -> OperationResult {
         if self.scroll_backwards().is_err() {
-            return Err(())
+            return Err(());
         } else {
-            while self.scroll_backwards().is_ok() { }
+            while self.scroll_backwards().is_ok() {}
             Ok(())
         }
     }
     fn scroll_to_end(&mut self) -> OperationResult {
         if self.scroll_forwards().is_err() {
-            return Err(())
+            return Err(());
         } else {
-            while self.scroll_forwards().is_ok() { }
+            while self.scroll_forwards().is_ok() {}
             Ok(())
         }
     }
@@ -211,14 +212,12 @@ pub trait Scrollable {
 
 // WriteBehavior ------------------------------------------
 
-pub struct WriteBehavior<'a, W: Writable+'a> {
+pub struct WriteBehavior<'a, W: Writable + 'a> {
     writable: &'a mut W,
 }
 impl<'a, W: Writable + 'a> WriteBehavior<'a, W> {
     pub fn new(writable: &'a mut W) -> Self {
-        WriteBehavior {
-            writable: writable,
-        }
+        WriteBehavior { writable: writable }
     }
 }
 
@@ -300,7 +299,7 @@ pub trait Navigatable {
 
 // EditBehavior ---------------------------------------------------------
 
-pub struct EditBehavior<'a, E: Editable+'a> {
+pub struct EditBehavior<'a, E: Editable + 'a> {
     editable: &'a mut E,
     up_on: EventSet,
     down_on: EventSet,

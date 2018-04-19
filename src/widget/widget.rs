@@ -1,13 +1,8 @@
-use base::{
-    Window,
-};
+use base::Window;
 use base::basic_types::*;
 use std::cmp::max;
 use std::marker::PhantomData;
-use std::ops:: {
-    Add,
-    AddAssign,
-};
+use std::ops::{Add, AddAssign};
 use std::iter::Sum;
 
 pub trait Widget {
@@ -22,9 +17,7 @@ pub struct RenderingHints {
 
 impl Default for RenderingHints {
     fn default() -> Self {
-        RenderingHints {
-            active: false,
-        }
+        RenderingHints { active: false }
     }
 }
 
@@ -41,7 +34,7 @@ impl<T: AxisDimension> Add<Demand<T>> for Demand<T> {
         Demand {
             min: self.min + rhs.min,
             max: if let (Some(l), Some(r)) = (self.max, rhs.max) {
-                Some(l+r)
+                Some(l + r)
             } else {
                 None
             },
@@ -55,17 +48,22 @@ impl<T: AxisDimension> AddAssign for Demand<T> {
     }
 }
 impl<T: AxisDimension + PartialOrd + Ord> Sum for Demand<T> {
-    fn sum<I>(iter: I) -> Self where I: Iterator<Item=Self> {
-        use ::std::ops::Add;
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Self>,
+    {
+        use std::ops::Add;
         iter.fold(Demand::exact(0), Demand::add)
     }
 }
 impl<'a, T: AxisDimension + PartialOrd + Ord> Sum<&'a Demand<T>> for Demand<T> {
-    fn sum<I>(iter: I) -> Demand<T> where I: Iterator<Item=&'a Demand<T>> {
+    fn sum<I>(iter: I) -> Demand<T>
+    where
+        I: Iterator<Item = &'a Demand<T>>,
+    {
         iter.fold(Demand::zero(), |d1: Demand<T>, d2: &Demand<T>| d1 + *d2)
     }
 }
-
 
 impl<T: AxisDimension + PartialOrd + Ord> Demand<T> {
     pub fn zero() -> Self {

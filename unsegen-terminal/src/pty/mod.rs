@@ -80,14 +80,9 @@ pub struct PTYOutput {
     pty: Arc<Mutex<PTY>>,
 }
 
-
 impl PTY {
     pub fn open() -> Result<PTY> {
-        open_ptm().map(|fd| {
-            PTY {
-                fd: fd,
-            }
-        })
+        open_ptm().map(|fd| PTY { fd: fd })
     }
 
     pub fn name(&self) -> &OsStr {
@@ -97,27 +92,31 @@ impl PTY {
         let pts_name = unsafe { ffi::ptsname(self.fd) };
 
         // This should not happen, as fd is always valid from open to drop.
-        assert!((pts_name as *const i32) != ::std::ptr::null(),
-                format!("ptsname failed. ({})", last_error()));
+        assert!(
+            (pts_name as *const i32) != ::std::ptr::null(),
+            format!("ptsname failed. ({})", last_error())
+        );
 
         let pts_name_cstr = unsafe { ::std::ffi::CStr::from_ptr(pts_name) };
         let pts_name_slice = pts_name_cstr.to_bytes();
 
-        use ::std::os::unix::ffi::OsStrExt;
+        use std::os::unix::ffi::OsStrExt;
         OsStr::from_bytes(pts_name_slice)
     }
 
     pub fn split_io(self) -> (PTYInput, PTYOutput) {
         let read = Arc::new(Mutex::new(self));
         let write = read.clone();
-        ( PTYInput { pty: read }, PTYOutput {pty: write} )
+        (PTYInput { pty: read }, PTYOutput { pty: write })
     }
 }
 
 impl Drop for PTY {
     fn drop(&mut self) {
-        assert!( unsafe { libc::close(self.as_raw_fd()) } == 0,
-                 format!("Closing PTY failed ({}).", last_error()));
+        assert!(
+            unsafe { libc::close(self.as_raw_fd()) } == 0,
+            format!("Closing PTY failed ({}).", last_error())
+        );
     }
 }
 
@@ -174,9 +173,7 @@ impl PTYInput {
 
         let res = {
             let lock = self.pty.lock().expect("lock pty for resize");
-            unsafe {
-                libc::ioctl(lock.fd, libc::TIOCSWINSZ, &size as *const libc::winsize)
-            }
+            unsafe { libc::ioctl(lock.fd, libc::TIOCSWINSZ, &size as *const libc::winsize) }
         };
 
         if res < 0 {
@@ -198,9 +195,11 @@ fn open_ptm() -> Result<libc::c_int> {
 
 fn read(fd: libc::c_int, buf: &mut [u8]) -> io::Result<usize> {
     let nread = unsafe {
-        libc::read(fd,
-                   buf.as_mut_ptr() as *mut libc::c_void,
-                   buf.len() as usize)
+        libc::read(
+            fd,
+            buf.as_mut_ptr() as *mut libc::c_void,
+            buf.len() as usize,
+        )
     };
 
     if nread < 0 {
@@ -213,11 +212,7 @@ fn read(fd: libc::c_int, buf: &mut [u8]) -> io::Result<usize> {
 }
 
 fn write(fd: libc::c_int, buf: &[u8]) -> io::Result<usize> {
-    let ret = unsafe {
-        libc::write(fd,
-                    buf.as_ptr() as *const libc::c_void,
-                    buf.len() as usize)
-    };
+    let ret = unsafe { libc::write(fd, buf.as_ptr() as *const libc::c_void, buf.len() as usize) };
 
     if ret < 0 {
         Err(io::Error::last_os_error())

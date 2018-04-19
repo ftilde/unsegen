@@ -10,35 +10,12 @@ mod index;
 mod terminalwindow;
 
 use unsegen::base::basic_types::*;
-use unsegen::base::{
-    Window,
-};
-use unsegen::input::{
-    Behavior,
-    Input,
-    OperationResult,
-    Scrollable,
-    ScrollBehavior,
-    Writable,
-    Key,
-};
-use unsegen::widget::{
-    Demand2D,
-    RenderingHints,
-    Widget,
-};
-use pty::{
-    PTY,
-    PTYInput,
-    PTYOutput,
-};
-use std::ffi::{
-    OsStr,
-    OsString,
-};
-use ansi::{
-    Processor,
-};
+use unsegen::base::Window;
+use unsegen::input::{Behavior, Input, Key, OperationResult, ScrollBehavior, Scrollable, Writable};
+use unsegen::widget::{Demand2D, RenderingHints, Widget};
+use pty::{PTYInput, PTYOutput, PTY};
+use std::ffi::{OsStr, OsString};
+use ansi::Processor;
 use unsegen::container::Container;
 
 use terminalwindow::TerminalWindow;
@@ -48,7 +25,7 @@ use std::thread;
 use std::cell::RefCell;
 
 fn read_slave_input_loop<S: SlaveInputSink>(sink: S, mut reader: PTYOutput) {
-    use ::std::io::Read;
+    use std::io::Read;
 
     let mut buffer = [0; 1024];
     while let Ok(n) = reader.read(&mut buffer) {
@@ -58,20 +35,18 @@ fn read_slave_input_loop<S: SlaveInputSink>(sink: S, mut reader: PTYOutput) {
     }
 }
 // Sink that receives all (byte) input that is send from a slave terminal
-pub trait SlaveInputSink : std::marker::Send {
+pub trait SlaveInputSink: std::marker::Send {
     fn send(&self, data: Box<[u8]>);
 }
 
 // Passes all inputs through to the modelled terminal
-pub struct PassthroughBehavior<'a>{
-    term: &'a mut Terminal
+pub struct PassthroughBehavior<'a> {
+    term: &'a mut Terminal,
 }
 
 impl<'a> PassthroughBehavior<'a> {
     pub fn new(term: &'a mut Terminal) -> Self {
-        PassthroughBehavior {
-            term: term,
-        }
+        PassthroughBehavior { term: term }
     }
 }
 
@@ -82,13 +57,13 @@ impl<'a> Behavior for PassthroughBehavior<'a> {
     }
 }
 
-
 pub struct Terminal {
     terminal_window: RefCell<TerminalWindow>,
     //slave_input_thread: thread::Thread,
     master_input_sink: RefCell<PTYInput>,
 
-    //Hack used to keep the slave device open as long as the master exists. This may not be a good idea, we will see...
+    // Hack used to keep the slave device open as long as the master exists.
+    // This may not be a good idea, we will see...
     _slave_handle: File,
     slave_name: OsString,
 
@@ -103,14 +78,22 @@ impl Terminal {
 
         let (pty_input, pty_output) = process_pty.split_io();
 
-        /*let slave_input_thread =*/ thread::Builder::new().name("slave input thread".to_owned()).spawn(move || {
-            read_slave_input_loop(input_sink, pty_output);
-        }).expect("Spawn slave input thread");
+        /*let slave_input_thread =*/
+        thread::Builder::new()
+            .name("slave input thread".to_owned())
+            .spawn(move || {
+                read_slave_input_loop(input_sink, pty_output);
+            })
+            .expect("Spawn slave input thread");
 
         // Hack:
         // Open slave terminal, so that it does not get destroyed when a gdb process opens it and
         // closes it afterwards.
-        let mut pts = std::fs::OpenOptions::new().write(true).read(true).open(&ptsname).expect("pts file");
+        let mut pts = std::fs::OpenOptions::new()
+            .write(true)
+            .read(true)
+            .open(&ptsname)
+            .expect("pts file");
         use std::io::Write;
         write!(pts, "").expect("initial write to pts");
 
@@ -130,7 +113,8 @@ impl Terminal {
         let mut window_ref = self.terminal_window.borrow_mut();
         let mut sink_ref = self.master_input_sink.borrow_mut();
         for byte in bytes.iter() {
-            self.ansi_processor.advance(window_ref.deref_mut(), *byte, sink_ref.deref_mut());
+            self.ansi_processor
+                .advance(window_ref.deref_mut(), *byte, sink_ref.deref_mut());
         }
     }
 
@@ -140,7 +124,10 @@ impl Terminal {
 
     pub fn process_input(&mut self, i: Input) {
         use std::io::Write;
-        self.master_input_sink.borrow_mut().write_all(i.raw.as_slice()).expect("Write to terminal");
+        self.master_input_sink
+            .borrow_mut()
+            .write_all(i.raw.as_slice())
+            .expect("Write to terminal");
     }
 
     fn ensure_size(&self, w: Width, h: Height) {
@@ -151,7 +138,10 @@ impl Terminal {
 
             let w16 = w.raw_value() as u16;
             let h16 = w.raw_value() as u16;
-            self.master_input_sink.borrow_mut().resize(w16, h16, w16 /* TODO ??*/, h16 /* TODO ??*/).expect("Resize pty");
+            self.master_input_sink
+                .borrow_mut()
+                .resize(w16, h16, w16 /* TODO ??*/, h16 /* TODO ??*/)
+                .expect("Resize pty");
         }
     }
 }
@@ -192,13 +182,14 @@ impl Widget for Terminal {
 impl<P: ?Sized> Container<P> for Terminal {
     fn input(&mut self, input: Input, _: &mut P) -> Option<Input> {
         input
-            .chain(ScrollBehavior::new(self)
+            .chain(
+                ScrollBehavior::new(self)
                     .forwards_on(Key::PageDown)
                     .backwards_on(Key::PageUp)
                     .to_beginning_on(Key::Home)
-                    .to_end_on(Key::End))
+                    .to_end_on(Key::End),
+            )
             .chain(PassthroughBehavior::new(self))
             .finish()
-
     }
 }

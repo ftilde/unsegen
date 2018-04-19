@@ -1,29 +1,11 @@
-use ndarray::{
-    Axis,
-};
+use ndarray::Axis;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion;
-use base::{
-    Style,
-    Window,
-    WindowBuffer,
-    Width,
-    Height,
-};
+use base::{Height, Style, Width, Window, WindowBuffer};
 use std::io;
-use std::io::{
-    Write,
-    StdoutLock,
-};
+use std::io::{StdoutLock, Write};
 
-use nix::sys::signal::{
-    SIGCONT,
-    SIGTSTP,
-    SigSet,
-    SigmaskHow,
-    kill,
-    pthread_sigmask,
-};
+use nix::sys::signal::{kill, pthread_sigmask, SigSet, SigmaskHow, SIGCONT, SIGTSTP};
 use nix::unistd::getpgrp;
 
 pub struct Terminal<'a> {
@@ -59,7 +41,8 @@ impl<'a> Terminal<'a> {
         stop_and_cont.add(SIGTSTP);
 
         // 1. Unblock SIGTSTP and SIGCONT, so that we actually stop when we receive another SIGTSTP
-        pthread_sigmask(SigmaskHow::SIG_UNBLOCK, Some(&stop_and_cont), None).expect("Unblock signals");
+        pthread_sigmask(SigmaskHow::SIG_UNBLOCK, Some(&stop_and_cont), None)
+            .expect("Unblock signals");
 
         // 2. Reissue SIGTSTP (this time to whole the process group!)...
         kill(-getpgrp(), SIGTSTP).expect("SIGTSTP self");
@@ -73,13 +56,23 @@ impl<'a> Terminal<'a> {
     }
 
     fn setup_terminal(&mut self) -> io::Result<()> {
-        write!(self.terminal, "{}{}", termion::screen::ToAlternateScreen, termion::cursor::Hide)?;
+        write!(
+            self.terminal,
+            "{}{}",
+            termion::screen::ToAlternateScreen,
+            termion::cursor::Hide
+        )?;
         self.terminal.flush()?;
         Ok(())
     }
 
     fn restore_terminal(&mut self) -> io::Result<()> {
-        write!(self.terminal, "{}{}", termion::screen::ToMainScreen, termion::cursor::Show)?;
+        write!(
+            self.terminal,
+            "{}{}",
+            termion::screen::ToMainScreen,
+            termion::cursor::Show
+        )?;
         self.terminal.flush()?;
         Ok(())
     }
@@ -99,12 +92,15 @@ impl<'a> Terminal<'a> {
 
     pub fn present(&mut self) {
         use std::io::Write;
-        //write!(self.terminal, "{}", termion::clear::All).expect("clear screen"); //Causes flickering and is unnecessary
 
         let mut current_style = Style::default();
 
         for (y, line) in self.values.storage().axis_iter(Axis(0)).enumerate() {
-            write!(self.terminal, "{}", termion::cursor::Goto(1, (y+1) as u16)).expect("move cursor");
+            write!(
+                self.terminal,
+                "{}",
+                termion::cursor::Goto(1, (y + 1) as u16)
+            ).expect("move cursor");
             let mut buffer = String::with_capacity(line.len());
             for c in line.iter() {
                 //TODO style
@@ -115,7 +111,9 @@ impl<'a> Terminal<'a> {
                     current_style = c.style;
                 }
                 let grapheme_cluster = match c.grapheme_cluster.as_str() {
-                    c @ "\t" | c @ "\n" | c @ "\r" | c @ "\0" => panic!("Invalid grapheme cluster written to terminal: {:?}", c),
+                    c @ "\t" | c @ "\n" | c @ "\r" | c @ "\0" => {
+                        panic!("Invalid grapheme cluster written to terminal: {:?}", c)
+                    }
                     x => x,
                 };
                 buffer.push_str(grapheme_cluster);
@@ -134,15 +132,8 @@ impl<'a> Drop for Terminal<'a> {
 }
 
 pub mod test {
-    use super::super::{
-        Height,
-        Style,
-        StyledGraphemeCluster,
-        Window,
-        WindowBuffer,
-        Width,
-        GraphemeCluster,
-    };
+    use super::super::{GraphemeCluster, Height, Style, StyledGraphemeCluster, Width, Window,
+                       WindowBuffer};
 
     #[derive(PartialEq)]
     pub struct FakeTerminal {
@@ -151,7 +142,10 @@ pub mod test {
     impl FakeTerminal {
         pub fn with_size((w, h): (u32, u32)) -> Self {
             FakeTerminal {
-                values: WindowBuffer::new(Width::new(w as i32).unwrap(), Height::new(h as i32).unwrap())
+                values: WindowBuffer::new(
+                    Width::new(w as i32).unwrap(),
+                    Height::new(h as i32).unwrap(),
+                ),
             }
         }
 
@@ -165,7 +159,10 @@ pub mod test {
             self.values.as_window()
         }
 
-        pub fn from_str((w, h): (u32, u32), description: &str) -> Result<Self, ::ndarray::ShapeError>{
+        pub fn from_str(
+            (w, h): (u32, u32),
+            description: &str,
+        ) -> Result<Self, ::ndarray::ShapeError> {
             let mut tiles = Vec::<StyledGraphemeCluster>::new();
             for c in GraphemeCluster::all_from_str(description) {
                 if c.as_str() == " " || c.as_str() == "\n" {
@@ -174,7 +171,9 @@ pub mod test {
                 tiles.push(StyledGraphemeCluster::new(c, Style::plain()));
             }
             Ok(FakeTerminal {
-                values: WindowBuffer::from_storage(try!{::ndarray::Array2::from_shape_vec((h as usize, w as usize), tiles)}),
+                values: WindowBuffer::from_storage(
+                    try!{::ndarray::Array2::from_shape_vec((h as usize, w as usize), tiles)},
+                ),
             })
         }
 
@@ -191,7 +190,7 @@ pub mod test {
                     let c = raw_values.get((r, c)).expect("debug: in bounds");
                     try!{write!(f, "{}", c.grapheme_cluster.as_str())};
                 }
-                if r != raw_values.dim().0-1 {
+                if r != raw_values.dim().0 - 1 {
                     try!{write!(f, "|")};
                 }
             }
