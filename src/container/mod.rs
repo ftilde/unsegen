@@ -516,9 +516,7 @@ impl<'a, C: ContainerProvider> Application<'a, C> {
                         LineSegment::South,
                         get_line_type(x, y_range.start - 1, LineSegment::South),
                     );
-                    // FIXME: Step trait stabilization
-                    for y in y_range.start.raw_value()..y_range.end.raw_value() {
-                        let y = RowIndex::new(y);
+                    for y in IndexRange(y_range.start..y_range.end) {
                         line_canvas
                             .get_mut(x, y)
                             .set(LineSegment::North, get_line_type(x, y, LineSegment::North))
@@ -534,9 +532,7 @@ impl<'a, C: ContainerProvider> Application<'a, C> {
                         LineSegment::East,
                         get_line_type(x_range.start - 1, y, LineSegment::East),
                     );
-                    // FIXME: Step trait stabilization
-                    for x in x_range.start.raw_value()..x_range.end.raw_value() {
-                        let x = ColIndex::new(x);
+                    for x in IndexRange(x_range.start..x_range.end) {
                         line_canvas
                             .get_mut(x, y)
                             .set(LineSegment::East, get_line_type(x, y, LineSegment::East))

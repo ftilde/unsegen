@@ -1,5 +1,5 @@
-use super::{ColDiff, ColIndex, GraphemeCluster, Height, RowDiff, RowIndex, Style, StyleModifier,
-            StyledGraphemeCluster, Width, Window};
+use super::{ColDiff, ColIndex, GraphemeCluster, Height, IndexRange, RowDiff, RowIndex, Style,
+            StyleModifier, StyledGraphemeCluster, Width, Window};
 use std::cmp::max;
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
@@ -208,9 +208,7 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
     fn clear_line_in_range(&mut self, range: Range<ColIndex>) {
         let style = self.active_style();
         let saved_x = self.state.x;
-        // FIXME: Step trait stabilization
-        for x in range.start.raw_value()..range.end.raw_value() {
-            let x: ColIndex = x.into();
+        for x in IndexRange(range.start..range.end) {
             self.move_to_x(x);
             self.write_cluster(GraphemeCluster::space(), &style)
                 .expect("range should be in window size");
@@ -320,11 +318,9 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             // Clear all cells (except the newly written one)
             let start_cluster_x = current_x;
             let start_cluster_width = current_width;
-            let range: Range<i32> =
-                start_cluster_x.into()..(start_cluster_x + start_cluster_width).into();
-            // FIXME: Step trait stabilization
-            for x_to_clear in range {
-                let x_to_clear: ColIndex = x_to_clear.into();
+            for x_to_clear in
+                IndexRange(start_cluster_x.into()..(start_cluster_x + start_cluster_width))
+            {
                 if x_to_clear != target_cluster_x {
                     self.window
                         .get_cell_mut(x_to_clear, y)
@@ -392,7 +388,6 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         }
         self.state.x += 1;
         if cluster_width > 1 && self.window.get_height().origin_range_contains(self.state.y) {
-            // FIXME: Step trait stabilization
             for _ in 1..cluster_width.into() {
                 if self.window.get_width().origin_range_contains(self.state.x) {
                     self.write_grapheme_cluster_unchecked(GraphemeCluster::empty(), style.clone());

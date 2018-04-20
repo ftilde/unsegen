@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::ops::{Add, AddAssign, Div, Mul, Neg, Rem, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, Mul, Neg, Range, Rem, Sub, SubAssign};
 use std::marker::PhantomData;
 use std::iter::Sum;
 
@@ -120,6 +120,23 @@ impl<T: AxisDimension> Neg for AxisIndex<T> {
 
     fn neg(self) -> Self::Output {
         AxisIndex::new(-self.val)
+    }
+}
+
+/// Wrapper for Ranges of AxisIndex to make them iterable.
+/// This should be removed once https://github.com/rust-lang/rust/issues/42168 is stabilized.
+pub struct IndexRange<T: AxisDimension>(pub Range<AxisIndex<T>>);
+
+impl<T: AxisDimension> Iterator for IndexRange<T> {
+    type Item = AxisIndex<T>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.0.start < self.0.end {
+            let res = self.0.start;
+            self.0.start += 1;
+            Some(res)
+        } else {
+            None
+        }
     }
 }
 
