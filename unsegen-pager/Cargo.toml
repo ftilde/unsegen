@@ -1,0 +1,10 @@
+[package]
+name = "unsegen-pager"
+version = "0.1.0"
+authors = ["ftilde <ftilde@protonmail.com>"]
+
+[dependencies]
+syntect = "1.8"
+
+[dependencies.unsegen]
+path = ".."

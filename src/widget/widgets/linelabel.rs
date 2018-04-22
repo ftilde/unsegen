@@ -1,6 +1,6 @@
 use super::super::{ColDemand, Demand2D, RenderingHints, RowDemand, Widget};
 use base::{Cursor, Window};
-use super::count_grapheme_clusters;
+use widget::count_grapheme_clusters;
 
 pub struct LineLabel {
     text: String,

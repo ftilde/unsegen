@@ -2,7 +2,6 @@
 extern crate ndarray;
 extern crate nix;
 extern crate smallvec;
-extern crate syntect;
 extern crate termion;
 extern crate unicode_segmentation;
 extern crate unicode_width;

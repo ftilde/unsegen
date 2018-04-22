@@ -1,11 +1,10 @@
-use super::super::{Demand, Demand2D, LineIndex, LineStorage, MemoryLineStorage, RenderingHints,
-                   Widget};
+use widget::{Demand, Demand2D, LineIndex, LineStorage, RenderingHints, StringLineStorage, Widget};
 use base::basic_types::*;
 use base::{Cursor, Window, WrappingMode};
 use input::{OperationResult, Scrollable};
 
 pub struct LogViewer {
-    pub storage: MemoryLineStorage<String>,
+    pub storage: StringLineStorage,
     scrollback_position: Option<usize>,
     scroll_step: usize,
 }
@@ -13,7 +12,7 @@ pub struct LogViewer {
 impl LogViewer {
     pub fn new() -> Self {
         LogViewer {
-            storage: MemoryLineStorage::new(),
+            storage: StringLineStorage::new(),
             scrollback_position: None,
             scroll_step: 1,
         }

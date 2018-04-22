@@ -1,7 +1,7 @@
 use widget::{Demand, Demand2D, RenderingHints, Widget};
 use base::{Cursor, ModifyMode, StyleModifier, Window};
 use base::basic_types::*;
-use super::{count_grapheme_clusters, text_width};
+use widget::{count_grapheme_clusters, text_width};
 use input::{Editable, Navigatable, OperationResult, Writable};
 use unicode_segmentation::UnicodeSegmentation;
 
