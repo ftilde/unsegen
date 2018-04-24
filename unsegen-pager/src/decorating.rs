@@ -8,7 +8,7 @@ pub trait LineDecorator {
     type Line: PagerLine;
     fn horizontal_space_demand<'a, 'b: 'a>(
         &'a self,
-        lines: Box<DoubleEndedIterator<Item = (LineIndex, Self::Line)> + 'b>,
+        lines: Box<DoubleEndedIterator<Item = (LineIndex, &'b Self::Line)> + 'b>,
     ) -> ColDemand;
     fn decorate(&self, line: &Self::Line, line_index: LineIndex, window: Window);
 }
@@ -29,7 +29,7 @@ impl<L: PagerLine> LineDecorator for NoDecorator<L> {
     type Line = L;
     fn horizontal_space_demand<'a, 'b: 'a>(
         &'a self,
-        _: Box<DoubleEndedIterator<Item = (LineIndex, Self::Line)> + 'b>,
+        _: Box<DoubleEndedIterator<Item = (LineIndex, &'b Self::Line)> + 'b>,
     ) -> ColDemand {
         Demand::exact(0)
     }
@@ -52,7 +52,7 @@ impl<L: PagerLine> LineDecorator for LineNumberDecorator<L> {
     type Line = L;
     fn horizontal_space_demand<'a, 'b: 'a>(
         &'a self,
-        lines: Box<DoubleEndedIterator<Item = (LineIndex, Self::Line)> + 'b>,
+        lines: Box<DoubleEndedIterator<Item = (LineIndex, &'b Self::Line)> + 'b>,
     ) -> ColDemand {
         let max_space = lines
             .last()

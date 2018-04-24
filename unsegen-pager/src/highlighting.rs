@@ -1,43 +1,40 @@
 use unsegen::base::{Color, ModifyMode, StyleModifier, TextFormatModifier};
+use unsegen::widget::LineIndex;
 
 use syntect::parsing::{ParseState, ScopeStack, SyntaxDefinition};
 use syntect::highlighting;
+use super::PagerLine;
+
 use syntect::highlighting::Theme;
 
+pub struct HighlightInfo {
+    style_changes: Vec<Vec<(usize, StyleModifier)>>,
+    default_style: StyleModifier,
+    no_change: Vec<(usize, StyleModifier)>,
+}
+
+impl HighlightInfo {
+    pub fn none() -> Self {
+        HighlightInfo {
+            style_changes: Vec::new(),
+            default_style: StyleModifier::none(),
+            no_change: Vec::new(),
+        }
+    }
+
+    pub fn get_info_for_line<L: Into<LineIndex>>(&self, l: L) -> &Vec<(usize, StyleModifier)> {
+        self.style_changes
+            .get(l.into().0)
+            .unwrap_or(&self.no_change)
+    }
+
+    pub fn default_style(&self) -> StyleModifier {
+        self.default_style
+    }
+}
+
 pub trait Highlighter {
-    type Instance: HighlightingInstance;
-    fn create_instance(&self) -> Self::Instance;
-}
-
-pub trait HighlightingInstance {
-    fn highlight<'a>(
-        &mut self,
-        line: &'a str,
-    ) -> Box<Iterator<Item = (StyleModifier, &'a str)> + 'a>;
-    fn default_style(&self) -> StyleModifier;
-}
-
-pub struct NoHighlighter;
-
-impl Highlighter for NoHighlighter {
-    type Instance = NoopHighlightingInstance;
-    fn create_instance(&self) -> Self::Instance {
-        NoopHighlightingInstance
-    }
-}
-
-pub struct NoopHighlightingInstance;
-
-impl HighlightingInstance for NoopHighlightingInstance {
-    fn highlight<'a>(
-        &mut self,
-        line: &'a str,
-    ) -> Box<Iterator<Item = (StyleModifier, &'a str)> + 'a> {
-        Box::new(Some((StyleModifier::none(), line)).into_iter())
-    }
-    fn default_style(&self) -> StyleModifier {
-        StyleModifier::none()
-    }
+    fn highlight<'a, L: Iterator<Item = &'a PagerLine>>(&self, lines: L) -> HighlightInfo;
 }
 
 pub struct SyntectHighlighter<'a> {
@@ -55,49 +52,32 @@ impl<'a> SyntectHighlighter<'a> {
 }
 
 impl<'a> Highlighter for SyntectHighlighter<'a> {
-    type Instance = SyntectHighlightingInstance<'a>;
-    fn create_instance(&self) -> Self::Instance {
-        SyntectHighlightingInstance::new(self.base_state.clone(), self.theme)
-    }
-}
+    fn highlight<'b, L: Iterator<Item = &'b PagerLine>>(&self, lines: L) -> HighlightInfo {
+        let mut info = HighlightInfo::none();
 
-pub struct SyntectHighlightingInstance<'a> {
-    highlighter: highlighting::Highlighter<'a>,
-    parse_state: ParseState,
-    highlight_state: highlighting::HighlightState,
-}
+        let highlighter = highlighting::Highlighter::new(self.theme);
+        let mut hstate = highlighting::HighlightState::new(&highlighter, ScopeStack::new());
+        let mut parse_state = self.base_state.clone();
 
-impl<'a> SyntectHighlightingInstance<'a> {
-    fn new(base_state: ParseState, theme: &'a highlighting::Theme) -> Self {
-        let highlighter = highlighting::Highlighter::new(theme);
-        let hstate = highlighting::HighlightState::new(&highlighter, ScopeStack::new());
-        SyntectHighlightingInstance {
-            highlighter: highlighter,
-            parse_state: base_state,
-            highlight_state: hstate,
+        for line in lines {
+            let line_content = line.get_content();
+            let mut current_pos = 0;
+            let mut this_line_changes = Vec::new();
+
+            let ops = parse_state.parse_line(line.get_content());
+            for (style, fragment) in highlighting::HighlightIterator::new(
+                &mut hstate,
+                &ops[..],
+                line_content,
+                &highlighter,
+            ) {
+                this_line_changes.push((current_pos, to_unsegen_style_modifier(&style)));
+                current_pos += fragment.len();
+            }
+            info.style_changes.push(this_line_changes);
         }
-    }
-}
-
-impl<'b> HighlightingInstance for SyntectHighlightingInstance<'b> {
-    fn highlight<'a>(
-        &mut self,
-        line: &'a str,
-    ) -> Box<Iterator<Item = (StyleModifier, &'a str)> + 'a> {
-        let ops = self.parse_state.parse_line(line);
-        let iter: Vec<(highlighting::Style, &'a str)> = highlighting::HighlightIterator::new(
-            &mut self.highlight_state,
-            &ops[..],
-            line,
-            &self.highlighter,
-        ).collect();
-        Box::new(
-            iter.into_iter()
-                .map(|(style, line)| (to_unsegen_style_modifier(&style), line)),
-        )
-    }
-    fn default_style(&self) -> StyleModifier {
-        to_unsegen_style_modifier(&self.highlighter.get_default())
+        info.default_style = to_unsegen_style_modifier(&highlighter.get_default());
+        info
     }
 }
 

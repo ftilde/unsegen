@@ -7,10 +7,13 @@ mod decorating;
 pub use highlighting::*;
 pub use decorating::*;
 
+pub use syntect::highlighting::{Theme, ThemeSet};
+pub use syntect::parsing::{SyntaxDefinition, SyntaxSet};
+
 use unsegen::base::{Cursor, GraphemeCluster, ModifyMode, StyleModifier, Window, WrappingMode,
                     basic_types::*};
-use unsegen::widget::{layout_linearly, Demand, Demand2D, LineIndex, LineStorage, RenderingHints,
-                      Widget};
+use unsegen::base::ranges::*;
+use unsegen::widget::{layout_linearly, Demand, Demand2D, LineIndex, RenderingHints, Widget};
 use unsegen::input::{OperationResult, Scrollable};
 
 use std::cmp::{max, min};
@@ -26,56 +29,104 @@ impl PagerLine for String {
 }
 
 // PagerContent ---------------------------------------------------------------
-pub struct PagerContent<S: LineStorage, H: Highlighter, D: LineDecorator> {
-    pub storage: S,
-    highlighter: H,
+pub struct PagerContent<L: PagerLine, D: LineDecorator> {
+    storage: Vec<L>,
+    highlight_info: HighlightInfo,
     pub decorator: D,
 }
 
-impl<S> PagerContent<S, NoHighlighter, NoDecorator<S::Line>>
-where
-    S: LineStorage,
-    S::Line: PagerLine,
-{
-    pub fn create(storage: S) -> Self {
+impl<L: PagerLine> PagerContent<L, NoDecorator<L>> {
+    pub fn from_lines(storage: Vec<L>) -> Self {
         PagerContent {
             storage: storage,
-            highlighter: NoHighlighter,
+            highlight_info: HighlightInfo::none(),
             decorator: NoDecorator::default(),
         }
     }
 }
 
-impl<S, D> PagerContent<S, NoHighlighter, D>
+impl PagerContent<String, NoDecorator<String>> {
+    pub fn from_file<F: AsRef<::std::path::Path>>(file_path: F) -> ::std::io::Result<Self> {
+        use std::io::Read;
+        let mut file = ::std::fs::File::open(file_path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+
+        Ok(PagerContent {
+            storage: contents.lines().map(|s| s.to_owned()).collect::<Vec<_>>(),
+            highlight_info: HighlightInfo::none(),
+            decorator: NoDecorator::default(),
+        })
+    }
+}
+
+impl<L, D> PagerContent<L, D>
 where
-    S: LineStorage,
-    S::Line: PagerLine,
-    D: LineDecorator<Line = S::Line>,
+    L: PagerLine,
+    D: LineDecorator<Line = L>,
 {
-    pub fn with_highlighter<HN: Highlighter>(self, highlighter: HN) -> PagerContent<S, HN, D> {
+    pub fn with_highlighter<HN: Highlighter>(self, highlighter: HN) -> PagerContent<L, D> {
+        let highlight_info = highlighter.highlight(self.storage.iter().map(|l| l as &PagerLine));
         PagerContent {
             storage: self.storage,
-            highlighter: highlighter,
+            highlight_info: highlight_info,
             decorator: self.decorator,
         }
     }
 }
 
-impl<S, H> PagerContent<S, H, NoDecorator<S::Line>>
+impl<L> PagerContent<L, NoDecorator<L>>
 where
-    S: LineStorage,
-    S::Line: PagerLine,
-    H: Highlighter,
+    L: PagerLine,
 {
-    pub fn with_decorator<DN: LineDecorator<Line = S::Line>>(
-        self,
-        decorator: DN,
-    ) -> PagerContent<S, H, DN> {
+    pub fn with_decorator<DN: LineDecorator<Line = L>>(self, decorator: DN) -> PagerContent<L, DN> {
         PagerContent {
             storage: self.storage,
-            highlighter: self.highlighter,
+            highlight_info: self.highlight_info,
             decorator: decorator,
         }
+    }
+}
+
+impl<L, D> PagerContent<L, D>
+where
+    L: PagerLine,
+    D: LineDecorator<Line = L>,
+{
+    pub fn view<'a, I: Into<LineIndex>, R: RangeArgument<I>>(
+        &'a self,
+        range: R,
+    ) -> Box<DoubleEndedIterator<Item = (LineIndex, &'a L)> + 'a>
+    where
+        Self: ::std::marker::Sized,
+    {
+        // Not exactly sure, why this is needed... we only store a reference?!
+        let start: LineIndex = match range.start() {
+            // Always inclusive
+            Bound::Unbound => LineIndex(0),
+            Bound::Inclusive(i) => i.into(),
+            Bound::Exclusive(i) => i.into() + 1,
+        };
+        let end: LineIndex = match range.end() {
+            // Always exclusive
+            Bound::Unbound => LineIndex(self.storage.len()),
+            Bound::Inclusive(i) => i.into() + 1,
+            Bound::Exclusive(i) => i.into(),
+        };
+        let ustart = start.0;
+        let uend = self.storage.len().min(end.0);
+        let urange = ustart..uend;
+        Box::new(
+            urange
+                .clone()
+                .into_iter()
+                .zip(self.storage[urange].iter())
+                .map(|(i, l)| (LineIndex(i), l)),
+        )
+    }
+
+    pub fn view_line<I: Into<LineIndex>>(&self, line: I) -> Option<&L> {
+        self.storage.get(line.into().0)
     }
 }
 
@@ -88,22 +139,19 @@ pub enum PagerError {
 
 // Pager -----------------------------------------------------------------------
 
-pub struct Pager<S, H = NoHighlighter, D = NoDecorator<<S as LineStorage>::Line>>
+pub struct Pager<L, D = NoDecorator<L>>
 where
-    S: LineStorage,
+    L: PagerLine,
     D: LineDecorator,
-    H: Highlighter,
 {
-    pub content: Option<PagerContent<S, H, D>>,
+    pub content: Option<PagerContent<L, D>>,
     current_line: LineIndex,
 }
 
-impl<S, H, D> Pager<S, H, D>
+impl<L, D> Pager<L, D>
 where
-    S: LineStorage,
-    S::Line: PagerLine,
-    D: LineDecorator<Line = S::Line>,
-    H: Highlighter,
+    L: PagerLine,
+    D: LineDecorator<Line = L>,
 {
     pub fn new() -> Self {
         Pager {
@@ -112,7 +160,7 @@ where
         }
     }
 
-    pub fn load(&mut self, content: PagerContent<S, H, D>) {
+    pub fn load(&mut self, content: PagerContent<L, D>) {
         self.content = Some(content);
 
         // Go back to last available line
@@ -122,16 +170,17 @@ where
         }
         self.current_line = new_current_line;
     }
-    fn line_exists<L: Into<LineIndex>>(&mut self, line: L) -> bool {
+
+    fn line_exists<I: Into<LineIndex>>(&mut self, line: I) -> bool {
         let line: LineIndex = line.into();
         if let Some(ref mut content) = self.content {
-            content.storage.view(line..(line + 1)).next().is_some()
+            line.0 < content.storage.len()
         } else {
             false
         }
     }
 
-    pub fn go_to_line<L: Into<LineIndex>>(&mut self, line: L) -> Result<(), PagerError> {
+    pub fn go_to_line<I: Into<LineIndex>>(&mut self, line: I) -> Result<(), PagerError> {
         let line: LineIndex = line.into();
         if self.line_exists(line) {
             self.current_line = line;
@@ -141,41 +190,39 @@ where
         }
     }
 
-    pub fn go_to_line_if<F: Fn(LineIndex, &S::Line) -> bool>(
+    pub fn go_to_line_if<F: Fn(LineIndex, &L) -> bool>(
         &mut self,
         predicate: F,
     ) -> Result<(), PagerError> {
         let line = if let Some(ref mut content) = self.content {
             content
-                .storage
                 .view(LineIndex(0)..)
                 .find(|&(index, ref line)| predicate(index.into(), line))
+                .map(|(index, _)| index)
                 .ok_or(PagerError::NoLineWithPredicate)
         } else {
             Err(PagerError::NoContent)
         };
-        line.and_then(|(index, _)| self.go_to_line(index))
+        line.and_then(|index| self.go_to_line(index))
     }
 
     pub fn current_line_index(&self) -> LineIndex {
         self.current_line
     }
 
-    pub fn current_line(&self) -> Option<S::Line> {
+    pub fn current_line(&self) -> Option<&L> {
         if let Some(ref content) = self.content {
-            content.storage.view_line(self.current_line_index())
+            content.storage.get(self.current_line_index().0)
         } else {
             None
         }
     }
 }
 
-impl<S, H, D> Widget for Pager<S, H, D>
+impl<L, D> Widget for Pager<L, D>
 where
-    S: LineStorage,
-    S::Line: PagerLine,
-    H: Highlighter,
-    D: LineDecorator<Line = S::Line>,
+    L: PagerLine,
+    D: LineDecorator<Line = L>,
 {
     fn space_demand(&self) -> Demand2D {
         Demand2D {
@@ -185,7 +232,6 @@ where
     }
     fn draw(&self, window: Window, _: RenderingHints) {
         if let Some(ref content) = self.content {
-            let mut highlighter = content.highlighter.create_instance();
             let height: Height = window.get_height();
             // The highlighter might need a minimum number of lines to figure out the syntax:
             // TODO: make this configurable?
@@ -199,7 +245,7 @@ where
             // Split window
             let decorator_demand = content
                 .decorator
-                .horizontal_space_demand(content.storage.view(min_line..max_line));
+                .horizontal_space_demand(content.view(min_line..max_line));
             let split_pos = layout_linearly(
                 window.get_width(),
                 Width::new(0).unwrap(),
@@ -211,7 +257,7 @@ where
                 .expect("valid split pos");
 
             // Fill background with correct color
-            let bg_style = highlighter.default_style();
+            let bg_style = content.highlight_info.default_style();
             content_window.set_default_style(bg_style.apply_to_default());
             content_window.fill(GraphemeCluster::space());
 
@@ -221,14 +267,12 @@ where
 
             let num_line_wraps_until_current_line = {
                 content
-                    .storage
                     .view(min_line..self.current_line)
                     .map(|(_, line)| (cursor.num_expected_wraps(line.get_content()) + 1) as i32)
                     .sum::<i32>()
             };
             let num_line_wraps_from_current_line = {
                 content
-                    .storage
                     .view(self.current_line..max_line)
                     .map(|(_, line)| (cursor.num_expected_wraps(line.get_content()) + 1) as i32)
                     .sum::<i32>()
@@ -246,7 +290,8 @@ where
 
             cursor.set_position(ColIndex::new(0), required_start_pos);
 
-            for (line_index, line) in content.storage.view(min_line..max_line) {
+            for (line_index, line) in content.view(min_line..max_line) {
+                let line_content = line.get_content();
                 let base_style = if line_index == self.current_line {
                     StyleModifier::new().invert(ModifyMode::Toggle).bold(true)
                 } else {
@@ -254,10 +299,15 @@ where
                 };
 
                 let (_, start_y) = cursor.get_position();
-                for (style, region) in highlighter.highlight(line.get_content()) {
+                let mut last_change_pos = 0;
+                for &(change_pos, style) in content.highlight_info.get_info_for_line(line_index) {
+                    cursor.write(&line_content[last_change_pos..change_pos]);
+
                     cursor.set_style_modifier(style.on_top_of(&base_style));
-                    cursor.write(&region);
+                    last_change_pos = change_pos;
                 }
+                cursor.write(&line_content[last_change_pos..]);
+
                 cursor.set_style_modifier(base_style);
                 cursor.fill_and_wrap_line();
                 let (_, end_y) = cursor.get_position();
@@ -274,12 +324,10 @@ where
         }
     }
 }
-impl<S, H, D> Scrollable for Pager<S, H, D>
+impl<L, D> Scrollable for Pager<L, D>
 where
-    S: LineStorage,
-    S::Line: PagerLine,
-    H: Highlighter,
-    D: LineDecorator<Line = S::Line>,
+    L: PagerLine,
+    D: LineDecorator<Line = L>,
 {
     fn scroll_backwards(&mut self) -> OperationResult {
         if self.current_line > LineIndex(0) {
