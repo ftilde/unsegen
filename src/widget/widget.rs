@@ -16,6 +16,19 @@ pub enum Blink {
     Off,
 }
 
+impl Blink {
+    pub fn toggled(self) -> Self {
+        match self {
+            Blink::On => Blink::Off,
+            Blink::Off => Blink::On,
+        }
+    }
+
+    pub fn toggle(&mut self) {
+        *self = self.toggled();
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct RenderingHints {
     pub active: bool,
