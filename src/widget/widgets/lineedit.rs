@@ -1,14 +1,14 @@
-use widget::{Demand, Demand2D, RenderingHints, Widget};
+use widget::{count_grapheme_clusters, text_width, Blink, Demand, Demand2D, RenderingHints, Widget};
 use base::{Cursor, ModifyMode, StyleModifier, Window};
 use base::basic_types::*;
-use widget::{count_grapheme_clusters, text_width};
 use input::{Editable, Navigatable, OperationResult, Writable};
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct LineEdit {
     text: String,
     cursor_pos: usize,
-    cursor_style_active: StyleModifier,
+    cursor_style_active_blink_on: StyleModifier,
+    cursor_style_active_blink_off: StyleModifier,
     cursor_style_inactive: StyleModifier,
 }
 
@@ -16,15 +16,21 @@ impl LineEdit {
     pub fn new() -> Self {
         Self::with_cursor_styles(
             StyleModifier::new().invert(ModifyMode::Toggle),
+            StyleModifier::new(),
             StyleModifier::new().underline(true),
         )
     }
 
-    pub fn with_cursor_styles(active: StyleModifier, inactive: StyleModifier) -> Self {
+    pub fn with_cursor_styles(
+        active_blink_on: StyleModifier,
+        active_blink_off: StyleModifier,
+        inactive: StyleModifier,
+    ) -> Self {
         LineEdit {
             text: String::new(),
             cursor_pos: 0,
-            cursor_style_active: active,
+            cursor_style_active_blink_on: active_blink_on,
+            cursor_style_active_blink_off: active_blink_off,
             cursor_style_inactive: inactive,
         }
     }
@@ -116,10 +122,10 @@ impl Widget for LineEdit {
             (window.get_width() - text_width_before_cursor as i32 - right_padding).from_origin(),
         );
 
-        let cursor_style = if hints.active {
-            self.cursor_style_active
-        } else {
-            self.cursor_style_inactive
+        let cursor_style = match (hints.active, hints.blink) {
+            (true, Blink::On) => self.cursor_style_active_blink_on,
+            (true, Blink::Off) => self.cursor_style_active_blink_off,
+            (false, _) => self.cursor_style_inactive,
         };
 
         let mut cursor = Cursor::new(&mut window).position(draw_cursor_start_pos, RowIndex::new(0));
