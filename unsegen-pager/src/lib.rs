@@ -317,6 +317,7 @@ where
                 content.decorator.decorate(
                     &line,
                     line_index,
+                    self.current_line,
                     decoration_window.create_subwindow(.., range_start_y..range_end_y),
                 );
                 //decoration_window.create_subwindow(.., range_start_y..range_end_y).fill('X');

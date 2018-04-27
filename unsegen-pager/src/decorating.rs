@@ -10,7 +10,13 @@ pub trait LineDecorator {
         &'a self,
         lines: Box<DoubleEndedIterator<Item = (LineIndex, &'b Self::Line)> + 'b>,
     ) -> ColDemand;
-    fn decorate(&self, line: &Self::Line, line_index: LineIndex, window: Window);
+    fn decorate(
+        &self,
+        line: &Self::Line,
+        line_to_decorate_index: LineIndex,
+        active_line_index: LineIndex,
+        window: Window,
+    );
 }
 
 pub struct NoDecorator<L> {
@@ -33,7 +39,7 @@ impl<L: PagerLine> LineDecorator for NoDecorator<L> {
     ) -> ColDemand {
         Demand::exact(0)
     }
-    fn decorate(&self, _: &L, _: LineIndex, _: Window) {}
+    fn decorate(&self, _: &L, _: LineIndex, _: LineIndex, _: Window) {}
 }
 
 pub struct LineNumberDecorator<L> {
@@ -60,9 +66,9 @@ impl<L: PagerLine> LineDecorator for LineNumberDecorator<L> {
             .unwrap_or(0);
         Demand::from_to(0, max_space)
     }
-    fn decorate(&self, _: &L, index: LineIndex, mut window: Window) {
+    fn decorate(&self, _: &L, line_to_decorate_index: LineIndex, _: LineIndex, mut window: Window) {
         let width = (window.get_width() - 2).positive_or_zero();
-        let line_number = LineNumber::from(index);
+        let line_number = LineNumber::from(line_to_decorate_index);
         let mut cursor = Cursor::new(&mut window).position(ColIndex::new(0), RowIndex::new(0));
 
         use std::fmt::Write;
