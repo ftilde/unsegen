@@ -474,7 +474,13 @@ impl<'a, C: ContainerProvider> Application<'a, C> {
         }
     }
 
-    pub fn draw(&self, mut window: Window, provider: &mut C, border_style: StyleModifier) {
+    pub fn draw(
+        &self,
+        mut window: Window,
+        provider: &mut C,
+        border_style: StyleModifier,
+        hints: RenderingHints,
+    ) {
         self.last_window_size
             .set((window.get_width(), window.get_height()));
 
@@ -489,10 +495,7 @@ impl<'a, C: ContainerProvider> Application<'a, C> {
         for (index, rect) in layout_result.windows {
             provider.get_mut(&index).draw(
                 window.create_subwindow(rect.x_range, rect.y_range),
-                RenderingHints {
-                    active: index == self.active,
-                    ..Default::default()
-                },
+                hints.active(index == self.active),
             );
         }
 

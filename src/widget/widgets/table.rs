@@ -221,10 +221,7 @@ impl<R: TableRow + 'static> Widget for Table<R> {
                         cell_window.modify_default_style(&self.focused_style);
                         hints
                     } else {
-                        RenderingHints {
-                            active: false,
-                            ..hints
-                        }
+                        hints.active(false)
                     };
 
                 cell_window.clear(); // Fill background using new style

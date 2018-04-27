@@ -11,13 +11,41 @@ pub trait Widget {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub enum Blink {
+    On,
+    Off,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct RenderingHints {
     pub active: bool,
+    pub blink: Blink,
+
+    // Make users of the library unable to construct RenderingHints from members.
+    // This way we can add members in a backwards compatible way in future versions.
+    #[doc(hidden)]
+    _do_not_construct: (),
 }
 
 impl Default for RenderingHints {
     fn default() -> Self {
-        RenderingHints { active: false }
+        RenderingHints {
+            active: false,
+            blink: Blink::On,
+            _do_not_construct: (),
+        }
+    }
+}
+
+impl RenderingHints {
+    pub fn active(self, val: bool) -> Self {
+        RenderingHints {
+            active: val,
+            ..self
+        }
+    }
+    pub fn blink(self, val: Blink) -> Self {
+        RenderingHints { blink: val, ..self }
     }
 }
 
