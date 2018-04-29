@@ -1,26 +1,57 @@
-use widget::{Demand, Demand2D, LineIndex, LineStorage, RenderingHints, StringLineStorage, Widget};
+use widget::{Demand, Demand2D, LineIndex, RenderingHints, Widget};
+use std::ops::{Range};
 use base::basic_types::*;
 use base::{Cursor, Window, WrappingMode};
 use input::{OperationResult, Scrollable};
+use std::fmt;
 
 pub struct LogViewer {
-    pub storage: StringLineStorage,
-    scrollback_position: Option<usize>,
+    storage: Vec<String>, // Invariant: always holds at least one line
+    scrollback_position: Option<LineIndex>,
     scroll_step: usize,
 }
 
 impl LogViewer {
     pub fn new() -> Self {
+        let mut storage = Vec::new();
+        storage.push(String::new()); //Fullfil invariant (at least one line)
         LogViewer {
-            storage: StringLineStorage::new(),
+            storage: storage,
             scrollback_position: None,
             scroll_step: 1,
         }
     }
 
-    fn current_line(&self) -> usize {
+    fn num_lines_stored(&self) -> usize {
+        self.storage.len()
+    }
+
+    fn current_line_index(&self) -> LineIndex {
         self.scrollback_position
-            .unwrap_or(self.storage.num_lines_stored().checked_sub(1).unwrap_or(0))
+            .unwrap_or(LineIndex(self.num_lines_stored().checked_sub(1).unwrap_or(0)))
+    }
+
+    pub fn active_line_mut(&mut self) -> &mut String {
+        return self.storage.last_mut().expect("Invariant: At least one line");
+    }
+
+    fn view(&self, range: Range<LineIndex>) -> &[String] {
+        &self.storage[range.start.0 .. range.end.0]
+    }
+}
+
+impl fmt::Write for LogViewer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let mut s = s.to_owned();
+
+        while let Some(newline_offset) = s.find('\n') {
+            let mut line: String = s.drain(..(newline_offset + 1)).collect();
+            line.pop(); //Remove the \n
+            self.active_line_mut().push_str(&line);
+            self.storage.push(String::new());
+        }
+        self.active_line_mut().push_str(&s);
+        Ok(())
     }
 }
 
@@ -45,9 +76,9 @@ impl Widget for LogViewer {
         let mut cursor = Cursor::new(&mut window)
             .position(ColIndex::new(0), y_start.from_origin())
             .wrapping_mode(WrappingMode::Wrap);
-        let end_line = LineIndex(self.current_line());
+        let end_line = self.current_line_index();
         let start_line = LineIndex(end_line.0.checked_sub(height.into()).unwrap_or(0));
-        for (_, line) in self.storage.view(start_line..(end_line + 1)).rev() {
+        for line in self.view(start_line .. (end_line + 1)).iter().rev() {
             let num_auto_wraps = cursor.num_expected_wraps(&line) as i32;
             cursor.move_by(ColDiff::new(0), RowDiff::new(-num_auto_wraps));
             cursor.writeln(&line);
@@ -58,9 +89,9 @@ impl Widget for LogViewer {
 
 impl Scrollable for LogViewer {
     fn scroll_forwards(&mut self) -> OperationResult {
-        let current = self.current_line();
+        let current = self.current_line_index();
         let candidate = current + self.scroll_step;
-        self.scrollback_position = if candidate < self.storage.num_lines_stored() {
+        self.scrollback_position = if candidate.0 < self.num_lines_stored() {
             Some(candidate)
         } else {
             None
@@ -72,16 +103,16 @@ impl Scrollable for LogViewer {
         }
     }
     fn scroll_backwards(&mut self) -> OperationResult {
-        let current = self.current_line();
-        let op_res = if current != 0 { Ok(()) } else { Err(()) };
-        self.scrollback_position = Some(current.checked_sub(self.scroll_step).unwrap_or(0));
+        let current = self.current_line_index();
+        let op_res = if current.0 != 0 { Ok(()) } else { Err(()) };
+        self.scrollback_position = Some(current.checked_sub(self.scroll_step).unwrap_or(LineIndex(0)));
         op_res
     }
     fn scroll_to_beginning(&mut self) -> OperationResult {
-        if Some(0) == self.scrollback_position {
+        if Some(LineIndex(0)) == self.scrollback_position {
             Err(())
         } else {
-            self.scrollback_position = Some(0);
+            self.scrollback_position = Some(LineIndex(0));
             Ok(())
         }
     }
