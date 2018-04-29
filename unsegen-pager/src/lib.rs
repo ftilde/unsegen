@@ -349,8 +349,20 @@ where
             Ok(())
         }
     }
-    // Using default implementation for now. We could try to do something different (but more
-    // complicated) if performance is an issue
-    //fn scroll_to_end(&mut self) -> OperationResult {
-    //}
+    fn scroll_to_end(&mut self) -> OperationResult {
+        if let Some(ref content) = self.content {
+            if content.storage.is_empty() {
+                return Err(());
+            }
+            let last_line = LineIndex::new(content.storage.len()-1);
+            if self.current_line == last_line {
+                Err(())
+            } else {
+                self.current_line = last_line;
+                Ok(())
+            }
+        } else {
+            Err(())
+        }
+    }
 }
