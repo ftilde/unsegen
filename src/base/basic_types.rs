@@ -518,7 +518,6 @@ pub type RowDiff = AxisDiff<RowDimension>;
 /// A PositiveAxisDiff in y-dimension.
 pub type Height = PositiveAxisDiff<RowDimension>;
 
-
 // ----------------------------------------------------------------------------
 // Wrapper types for line numbering -------------------------------------------
 // ----------------------------------------------------------------------------
@@ -528,7 +527,6 @@ pub type Height = PositiveAxisDiff<RowDimension>;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug, Hash)]
 pub struct LineIndex(usize);
 impl LineIndex {
-
     /// Create a new LineIndex from a raw value.
     pub fn new(val: usize) -> Self {
         LineIndex(val)
@@ -602,7 +600,6 @@ impl fmt::Display for LineIndex {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug, Hash)]
 pub struct LineNumber(usize); //Invariant: value is always >= 1
 impl LineNumber {
-
     /// Create a new LineNumber from a raw value.
     ///
     /// # Panics:

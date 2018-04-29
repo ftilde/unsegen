@@ -354,7 +354,7 @@ where
             if content.storage.is_empty() {
                 return Err(());
             }
-            let last_line = LineIndex::new(content.storage.len()-1);
+            let last_line = LineIndex::new(content.storage.len() - 1);
             if self.current_line == last_line {
                 Err(())
             } else {

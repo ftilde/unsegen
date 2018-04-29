@@ -1,5 +1,5 @@
 use widget::{Demand, Demand2D, RenderingHints, Widget};
-use std::ops::{Range};
+use std::ops::Range;
 use base::basic_types::*;
 use base::{Cursor, Window, WrappingMode};
 use input::{OperationResult, Scrollable};
@@ -27,16 +27,19 @@ impl LogViewer {
     }
 
     fn current_line_index(&self) -> LineIndex {
-        self.scrollback_position
-            .unwrap_or(LineIndex::new(self.num_lines_stored().checked_sub(1).unwrap_or(0)))
+        self.scrollback_position.unwrap_or(LineIndex::new(
+            self.num_lines_stored().checked_sub(1).unwrap_or(0),
+        ))
     }
 
     pub fn active_line_mut(&mut self) -> &mut String {
-        return self.storage.last_mut().expect("Invariant: At least one line");
+        return self.storage
+            .last_mut()
+            .expect("Invariant: At least one line");
     }
 
     fn view(&self, range: Range<LineIndex>) -> &[String] {
-        &self.storage[range.start.raw_value() .. range.end.raw_value()]
+        &self.storage[range.start.raw_value()..range.end.raw_value()]
     }
 }
 
@@ -77,8 +80,9 @@ impl Widget for LogViewer {
             .position(ColIndex::new(0), y_start.from_origin())
             .wrapping_mode(WrappingMode::Wrap);
         let end_line = self.current_line_index();
-        let start_line = LineIndex::new(end_line.raw_value().checked_sub(height.into()).unwrap_or(0));
-        for line in self.view(start_line .. (end_line + 1)).iter().rev() {
+        let start_line =
+            LineIndex::new(end_line.raw_value().checked_sub(height.into()).unwrap_or(0));
+        for line in self.view(start_line..(end_line + 1)).iter().rev() {
             let num_auto_wraps = cursor.num_expected_wraps(&line) as i32;
             cursor.move_by(ColDiff::new(0), RowDiff::new(-num_auto_wraps));
             cursor.writeln(&line);
@@ -104,8 +108,16 @@ impl Scrollable for LogViewer {
     }
     fn scroll_backwards(&mut self) -> OperationResult {
         let current = self.current_line_index();
-        let op_res = if current.raw_value() != 0 { Ok(()) } else { Err(()) };
-        self.scrollback_position = Some(current.checked_sub(self.scroll_step).unwrap_or(LineIndex::new(0)));
+        let op_res = if current.raw_value() != 0 {
+            Ok(())
+        } else {
+            Err(())
+        };
+        self.scrollback_position = Some(
+            current
+                .checked_sub(self.scroll_step)
+                .unwrap_or(LineIndex::new(0)),
+        );
         op_res
     }
     fn scroll_to_beginning(&mut self) -> OperationResult {
