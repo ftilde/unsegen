@@ -1,10 +1,8 @@
 pub mod layouts;
-pub mod linestorage;
 pub mod widget;
 pub mod widgets;
 
 pub use self::layouts::*;
-pub use self::linestorage::*;
 pub use self::widget::*;
 
 pub fn count_grapheme_clusters(text: &str) -> usize {
