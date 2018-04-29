@@ -11,9 +11,8 @@ pub use syntect::highlighting::{Theme, ThemeSet};
 pub use syntect::parsing::{SyntaxDefinition, SyntaxSet};
 
 use unsegen::base::{Cursor, GraphemeCluster, ModifyMode, StyleModifier, Window, WrappingMode,
-                    basic_types::*};
-use unsegen::base::ranges::*;
-use unsegen::widget::{layout_linearly, Demand, Demand2D, LineIndex, RenderingHints, Widget};
+                    basic_types::*, ranges::*};
+use unsegen::widget::{layout_linearly, Demand, Demand2D, RenderingHints, Widget};
 use unsegen::input::{OperationResult, Scrollable};
 
 use std::cmp::{max, min};
@@ -103,30 +102,30 @@ where
         // Not exactly sure, why this is needed... we only store a reference?!
         let start: LineIndex = match range.start() {
             // Always inclusive
-            Bound::Unbound => LineIndex(0),
+            Bound::Unbound => LineIndex::new(0),
             Bound::Inclusive(i) => i.into(),
             Bound::Exclusive(i) => i.into() + 1,
         };
         let end: LineIndex = match range.end() {
             // Always exclusive
-            Bound::Unbound => LineIndex(self.storage.len()),
+            Bound::Unbound => LineIndex::new(self.storage.len()),
             Bound::Inclusive(i) => i.into() + 1,
             Bound::Exclusive(i) => i.into(),
         };
-        let ustart = start.0;
-        let uend = self.storage.len().min(end.0);
+        let ustart = start.raw_value();
+        let uend = self.storage.len().min(end.raw_value());
         let urange = ustart..uend;
         Box::new(
             urange
                 .clone()
                 .into_iter()
                 .zip(self.storage[urange].iter())
-                .map(|(i, l)| (LineIndex(i), l)),
+                .map(|(i, l)| (LineIndex::new(i), l)),
         )
     }
 
     pub fn view_line<I: Into<LineIndex>>(&self, line: I) -> Option<&L> {
-        self.storage.get(line.into().0)
+        self.storage.get(line.into().raw_value())
     }
 }
 
@@ -156,7 +155,7 @@ where
     pub fn new() -> Self {
         Pager {
             content: None,
-            current_line: LineIndex(0),
+            current_line: LineIndex::new(0),
         }
     }
 
@@ -174,7 +173,7 @@ where
     fn line_exists<I: Into<LineIndex>>(&mut self, line: I) -> bool {
         let line: LineIndex = line.into();
         if let Some(ref mut content) = self.content {
-            line.0 < content.storage.len()
+            line.raw_value() < content.storage.len()
         } else {
             false
         }
@@ -196,7 +195,7 @@ where
     ) -> Result<(), PagerError> {
         let line = if let Some(ref mut content) = self.content {
             content
-                .view(LineIndex(0)..)
+                .view(LineIndex::new(0)..)
                 .find(|&(index, ref line)| predicate(index.into(), line))
                 .map(|(index, _)| index)
                 .ok_or(PagerError::NoLineWithPredicate)
@@ -212,7 +211,7 @@ where
 
     pub fn current_line(&self) -> Option<&L> {
         if let Some(ref content) = self.content {
-            content.storage.get(self.current_line_index().0)
+            content.storage.get(self.current_line_index().raw_value())
         } else {
             None
         }
@@ -239,7 +238,7 @@ where
             let num_adjacent_lines_to_load = max(height.into(), min_highlight_context / 2);
             let min_line = self.current_line
                 .checked_sub(num_adjacent_lines_to_load)
-                .unwrap_or(LineIndex(0));
+                .unwrap_or(LineIndex::new(0));
             let max_line = self.current_line + num_adjacent_lines_to_load;
 
             // Split window
@@ -331,7 +330,7 @@ where
     D: LineDecorator<Line = L>,
 {
     fn scroll_backwards(&mut self) -> OperationResult {
-        if self.current_line > LineIndex(0) {
+        if self.current_line > LineIndex::new(0) {
             self.current_line -= 1;
             Ok(())
         } else {
@@ -343,10 +342,10 @@ where
         self.go_to_line(new_line).map_err(|_| ())
     }
     fn scroll_to_beginning(&mut self) -> OperationResult {
-        if self.current_line == LineIndex(0) {
+        if self.current_line == LineIndex::new(0) {
             Err(())
         } else {
-            self.current_line = LineIndex(0);
+            self.current_line = LineIndex::new(0);
             Ok(())
         }
     }

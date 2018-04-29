@@ -1,5 +1,4 @@
-use unsegen::base::{Color, ModifyMode, StyleModifier, TextFormatModifier};
-use unsegen::widget::LineIndex;
+use unsegen::base::{Color, LineIndex, ModifyMode, StyleModifier, TextFormatModifier};
 
 use syntect::parsing::{ParseState, ScopeStack, SyntaxDefinition};
 use syntect::highlighting;
@@ -24,7 +23,7 @@ impl HighlightInfo {
 
     pub fn get_info_for_line<L: Into<LineIndex>>(&self, l: L) -> &Vec<(usize, StyleModifier)> {
         self.style_changes
-            .get(l.into().0)
+            .get(l.into().raw_value())
             .unwrap_or(&self.no_change)
     }
 

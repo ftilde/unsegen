@@ -1,4 +1,4 @@
-use unsegen::widget::{text_width, ColDemand, Demand, LineIndex, LineNumber};
+use unsegen::widget::{text_width, ColDemand, Demand};
 use unsegen::base::{Cursor, Window};
 use unsegen::base::basic_types::*;
 

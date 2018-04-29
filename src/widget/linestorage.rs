@@ -5,115 +5,9 @@ use std::fs::{File, Metadata};
 use std::io;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::ops::{Add, AddAssign, Range, Sub, SubAssign};
+use std::ops::{Range};
 use base::ranges::{Bound, RangeArgument};
-// Starting from 0, i.e., treating LineStorage like an array of lines
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug, Hash)]
-pub struct LineIndex(pub usize);
-impl LineIndex {
-    pub fn checked_sub(&self, rhs: usize) -> Option<LineIndex> {
-        let index = self.0;
-        index.checked_sub(rhs).map(LineIndex)
-    }
-}
-
-impl Into<usize> for LineIndex {
-    fn into(self) -> usize {
-        let LineIndex(index) = self;
-        index
-    }
-}
-
-impl From<LineNumber> for LineIndex {
-    fn from(LineNumber(raw_number): LineNumber) -> Self {
-        LineIndex(raw_number - 1)
-    }
-}
-impl Add<usize> for LineIndex {
-    type Output = Self;
-    fn add(self, rhs: usize) -> Self {
-        let raw_index: usize = self.into();
-        LineIndex(raw_index + rhs)
-    }
-}
-impl AddAssign<usize> for LineIndex {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = *self + rhs;
-    }
-}
-impl Sub<usize> for LineIndex {
-    type Output = Self;
-    fn sub(self, rhs: usize) -> Self {
-        let raw_index: usize = self.into();
-        LineIndex(raw_index - rhs)
-    }
-}
-impl SubAssign<usize> for LineIndex {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = *self - rhs;
-    }
-}
-impl fmt::Display for LineIndex {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-// Starting from 1, i.e., treating LineStorage like lines displayed in an editor
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug, Hash)]
-pub struct LineNumber(pub usize);
-impl LineNumber {
-    pub fn checked_sub(&self, rhs: usize) -> Option<LineNumber> {
-        let index = self.0 - 1;
-        index.checked_sub(rhs).map(|i| LineNumber(i + 1))
-    }
-}
-
-impl Into<usize> for LineNumber {
-    fn into(self) -> usize {
-        let LineNumber(number) = self;
-        debug_assert!(number > 0, "Invalid LineNumber: Number == 0");
-        number
-    }
-}
-impl From<LineIndex> for LineNumber {
-    fn from(LineIndex(raw_index): LineIndex) -> Self {
-        LineNumber(raw_index + 1)
-    }
-}
-impl Add<usize> for LineNumber {
-    type Output = Self;
-    fn add(self, rhs: usize) -> Self {
-        let raw_number: usize = self.into();
-        LineNumber(raw_number + rhs)
-    }
-}
-impl AddAssign<usize> for LineNumber {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = *self + rhs;
-    }
-}
-impl Sub<usize> for LineNumber {
-    type Output = Self;
-    fn sub(self, rhs: usize) -> Self {
-        let raw_number: usize = self.into();
-        debug_assert!(
-            raw_number > rhs,
-            "Overflowing sub on LineNumber: Result would be <= 0"
-        );
-        LineNumber(raw_number - rhs)
-    }
-}
-impl SubAssign<usize> for LineNumber {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = *self - rhs;
-    }
-}
-impl fmt::Display for LineNumber {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
+use base::basic_types::*;
 
 pub trait LineStorage {
     type Line;
@@ -129,7 +23,7 @@ pub trait LineStorage {
         // Not exactly sure, why this is needed... we only store a reference?!
         let start: LineIndex = match range.start() {
             // Always inclusive
-            Bound::Unbound => LineIndex(0),
+            Bound::Unbound => LineIndex::new(0),
             Bound::Inclusive(i) => i.into(),
             Bound::Exclusive(i) => i.into() + 1,
         };
@@ -141,7 +35,7 @@ pub trait LineStorage {
                 let mut end = start;
                 for i in u_start.. {
                     end += 1;
-                    if self.view_line(LineIndex(i)).is_none() {
+                    if self.view_line(LineIndex::new(i)).is_none() {
                         break;
                     }
                 }
@@ -177,8 +71,8 @@ impl<'a, I: 'a, L: 'a + LineStorage<Line = I>> Iterator for LineStorageIterator<
         if self.range.start < self.range.end {
             let item_index = self.range.start;
             self.range.start += 1;
-            if let Some(line) = self.storage.view_line(LineIndex(item_index)) {
-                Some((LineIndex(item_index), line))
+            if let Some(line) = self.storage.view_line(LineIndex::new(item_index)) {
+                Some((LineIndex::new(item_index), line))
             } else {
                 None
             }
@@ -195,8 +89,8 @@ impl<'a, I: 'a, L: 'a + LineStorage<Line = I>> DoubleEndedIterator
         if self.range.start < self.range.end {
             let item_index = self.range.end - 1;
             self.range.end -= 1;
-            if let Some(line) = self.storage.view_line(LineIndex(item_index)) {
-                Some((LineIndex(item_index), line))
+            if let Some(line) = self.storage.view_line(LineIndex::new(item_index)) {
+                Some((LineIndex::new(item_index), line))
             } else {
                 None
             }

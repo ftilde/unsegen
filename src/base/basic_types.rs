@@ -1,7 +1,9 @@
+//! Basic numeric semantic wrapper types for use in other parts of the library.
 use std::cmp::Ordering;
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Range, Rem, Sub, SubAssign};
 use std::marker::PhantomData;
 use std::iter::Sum;
+use std::fmt;
 
 /// AxisIndex (the base for ColIndex or RowIndex) is a signed integer coordinate (i.e., a
 /// coordinate of a point on the terminal cell grid)
@@ -29,7 +31,7 @@ impl<T: AxisDimension> AxisIndex<T> {
     /// Technically this just converts an AxisIndex into an AxisDiff, but is semantically more
     /// explicit.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::{ColIndex, ColDiff};
@@ -40,7 +42,8 @@ impl<T: AxisDimension> AxisIndex<T> {
     }
 
     /// Clamp the value into a positive or zero range
-    /// Example:
+    ///
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::ColIndex;
@@ -124,7 +127,7 @@ impl<T: AxisDimension> Neg for AxisIndex<T> {
 }
 
 /// Wrapper for Ranges of AxisIndex to make them iterable.
-/// This should be removed once https://github.com/rust-lang/rust/issues/42168 is stabilized.
+/// This should be removed once [#42168](https://github.com/rust-lang/rust/issues/42168) is stabilized.
 pub struct IndexRange<T: AxisDimension>(pub Range<AxisIndex<T>>);
 
 impl<T: AxisDimension> Iterator for IndexRange<T> {
@@ -166,7 +169,7 @@ impl<T: AxisDimension> AxisDiff<T> {
     /// Technically this just converts an AxisIndex into an AxisDiff, but is semantically more
     /// explicit.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::{ColIndex, ColDiff};
@@ -179,7 +182,7 @@ impl<T: AxisDimension> AxisDiff<T> {
     /// Try to convert the current value into a PositiveAxisDiff.
     /// If the conversion fails, the original value is returned.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::{ColDiff, Width};
@@ -194,7 +197,7 @@ impl<T: AxisDimension> AxisDiff<T> {
     /// Convert the current value into a PositiveAxisDiff by taking the absolute value of the axis
     /// difference.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::{ColDiff, Width};
@@ -207,7 +210,8 @@ impl<T: AxisDimension> AxisDiff<T> {
     }
 
     /// Clamp the value into a positive or zero range
-    /// Example:
+    ///
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::ColDiff;
@@ -301,7 +305,8 @@ pub struct PositiveAxisDiff<T: AxisDimension> {
 impl<T: AxisDimension> PositiveAxisDiff<T> {
     /// Create a new PositiveAxisDiff from an i32.
     /// If v < 0 the behavior is unspecified.
-    /// Example:
+    ///
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::Width;
@@ -320,7 +325,7 @@ impl<T: AxisDimension> PositiveAxisDiff<T> {
     /// Try to create a new PositiveAxisDiff from an i32. If v < 0 the behavior an error value is
     /// returned.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::Width;
@@ -348,7 +353,7 @@ impl<T: AxisDimension> PositiveAxisDiff<T> {
     /// Technically this just converts an AxisIndex into an PositiveAxisDiff, but is semantically
     /// more explicit.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::{ColIndex, Width};
@@ -360,7 +365,7 @@ impl<T: AxisDimension> PositiveAxisDiff<T> {
 
     /// Check whether the given AxisIndex is in the range [0, self)
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::{ColIndex, Width};
@@ -376,7 +381,7 @@ impl<T: AxisDimension> PositiveAxisDiff<T> {
 
     /// Convert the positive axis index into an AxisDiff.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::{ColDiff, Width};
@@ -512,3 +517,160 @@ pub type RowDiff = AxisDiff<RowDimension>;
 
 /// A PositiveAxisDiff in y-dimension.
 pub type Height = PositiveAxisDiff<RowDimension>;
+
+
+// ----------------------------------------------------------------------------
+// Wrapper types for line numbering -------------------------------------------
+// ----------------------------------------------------------------------------
+
+/// A type for enumerating lines by index (rather than by number), i.e., starting from 0.
+/// Conversions between LineNumber and LineIndex are always safe.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug, Hash)]
+pub struct LineIndex(usize);
+impl LineIndex {
+
+    /// Create a new LineIndex from a raw value.
+    pub fn new(val: usize) -> Self {
+        LineIndex(val)
+    }
+
+    /// Unpack the LineIndex and yield the underlying value.
+    pub fn raw_value(self) -> usize {
+        self.0
+    }
+
+    /// Checked integer subtraction. Computes self - rhs, returning None if the result is invalid
+    /// (i.e., smaller than 0).
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::LineIndex;
+    /// assert_eq!(LineIndex::new(37).checked_sub(27), Some(LineIndex::new(10)));
+    /// assert_eq!(LineIndex::new(27).checked_sub(37), None);
+    /// ```
+    pub fn checked_sub(&self, rhs: usize) -> Option<LineIndex> {
+        let index = self.0;
+        index.checked_sub(rhs).map(LineIndex)
+    }
+}
+
+impl Into<usize> for LineIndex {
+    fn into(self) -> usize {
+        let LineIndex(index) = self;
+        index
+    }
+}
+
+impl From<LineNumber> for LineIndex {
+    fn from(LineNumber(raw_number): LineNumber) -> Self {
+        // This is safe, as LineNumber (per invariant) is >= 1
+        LineIndex::new(raw_number - 1)
+    }
+}
+impl Add<usize> for LineIndex {
+    type Output = Self;
+    fn add(self, rhs: usize) -> Self {
+        let raw_index: usize = self.into();
+        LineIndex::new(raw_index + rhs)
+    }
+}
+impl AddAssign<usize> for LineIndex {
+    fn add_assign(&mut self, rhs: usize) {
+        *self = *self + rhs;
+    }
+}
+impl Sub<usize> for LineIndex {
+    type Output = Self;
+    fn sub(self, rhs: usize) -> Self {
+        let raw_index: usize = self.into();
+        LineIndex::new(raw_index - rhs)
+    }
+}
+impl SubAssign<usize> for LineIndex {
+    fn sub_assign(&mut self, rhs: usize) {
+        *self = *self - rhs;
+    }
+}
+impl fmt::Display for LineIndex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// A type for enumerating lines by number (rather than by index), i.e., starting from 1.
+/// Conversions between LineNumber and LineIndex are always safe.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug, Hash)]
+pub struct LineNumber(usize); //Invariant: value is always >= 1
+impl LineNumber {
+
+    /// Create a new LineNumber from a raw value.
+    ///
+    /// # Panics:
+    ///
+    /// Panics if val is 0 (as line numbers start from 1).
+    pub fn new(val: usize) -> Self {
+        assert!(val > 0, "Invalid LineNumber: Number == 0");
+        LineNumber(val)
+    }
+
+    /// Unpack the LineNumber and yield the underlying value.
+    pub fn raw_value(self) -> usize {
+        self.0
+    }
+
+    /// Checked integer subtraction. Computes self - rhs, returning None if the result is invalid
+    /// (i.e., smaller than 1).
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::LineNumber;
+    /// assert_eq!(LineNumber::new(37).checked_sub(27), Some(LineNumber::new(10)));
+    /// assert_eq!(LineNumber::new(27).checked_sub(37), None);
+    /// assert_eq!(LineNumber::new(1).checked_sub(1), None);
+    /// assert_eq!(LineNumber::new(2).checked_sub(1), Some(LineNumber::new(1)));
+    /// ```
+    pub fn checked_sub(&self, rhs: usize) -> Option<LineNumber> {
+        let index = self.0 - 1; // Safe according to invariant: self.0 >= 1
+        index.checked_sub(rhs).map(|i| LineNumber(i + 1))
+    }
+}
+
+impl Into<usize> for LineNumber {
+    fn into(self) -> usize {
+        self.0
+    }
+}
+impl From<LineIndex> for LineNumber {
+    fn from(LineIndex(raw_index): LineIndex) -> Self {
+        LineNumber::new(raw_index + 1)
+    }
+}
+impl Add<usize> for LineNumber {
+    type Output = Self;
+    fn add(self, rhs: usize) -> Self {
+        let raw_number: usize = self.into();
+        LineNumber::new(raw_number + rhs)
+    }
+}
+impl AddAssign<usize> for LineNumber {
+    fn add_assign(&mut self, rhs: usize) {
+        *self = *self + rhs;
+    }
+}
+impl Sub<usize> for LineNumber {
+    type Output = Self;
+    fn sub(self, rhs: usize) -> Self {
+        let raw_number: usize = self.into();
+        LineNumber::new(raw_number - rhs)
+    }
+}
+impl SubAssign<usize> for LineNumber {
+    fn sub_assign(&mut self, rhs: usize) {
+        *self = *self - rhs;
+    }
+}
+impl fmt::Display for LineNumber {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
