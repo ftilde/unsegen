@@ -1,6 +1,10 @@
+//! Copy of [unstable traits and
+//! types](https://doc.rust-lang.org/std/collections/range/trait.RangeArgument.html)
+//!
+//! These will be removed once [#30877](https://github.com/rust-lang/rust/issues/30877) is
+//! stabilized.
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
-//TODO: Move to std traits and types once they are stabilized: https://github.com/rust-lang/rust/issues/30877
 pub enum Bound<T> {
     Unbound,
     Inclusive(T),

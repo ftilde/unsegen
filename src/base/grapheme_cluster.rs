@@ -15,7 +15,7 @@ pub struct GraphemeCluster {
 impl GraphemeCluster {
     /// Get the underlying grapheme cluster as a String slice.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::GraphemeCluster;
@@ -53,7 +53,7 @@ impl GraphemeCluster {
 
     /// Safely create a single space character (i.e., 0x20) grapheme cluster.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::GraphemeCluster;
@@ -65,7 +65,7 @@ impl GraphemeCluster {
 
     /// Replace the current cluster with a single space character (i.e., 0x20)
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::GraphemeCluster;
@@ -80,7 +80,7 @@ impl GraphemeCluster {
     /// Try to create a grapheme cluster from a character. If c is not a single grapheme cluster, a
     /// GraphemeClusterError is returned.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::GraphemeCluster;
@@ -92,7 +92,7 @@ impl GraphemeCluster {
 
     /// Retrieve all grapheme clusters from the given string.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::GraphemeCluster;
@@ -109,7 +109,7 @@ impl GraphemeCluster {
 
     /// Calculate the unicode width of the given grapheme cluster.
     ///
-    /// Example:
+    /// # Examples:
     ///
     /// ```
     /// use unsegen::base::GraphemeCluster;

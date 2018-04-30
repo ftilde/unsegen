@@ -1,3 +1,29 @@
+//! The entry point module for presenting data to the terminal.
+//!
+//! To get started, create a terminal, create a root window from it, use it to render stuff to the
+//! terminal and finally present the terminal content to the physical terminal.
+//!
+//! # Examples:
+//!
+//! ```should_panic //tests do not provide a fully functional terminal
+//! use unsegen::base::Terminal;
+//! use std::io::stdout;
+//! let stdout = stdout();
+//! let mut term = Terminal::new(stdout.lock());
+//!
+//! let mut done = false;
+//! while !done {
+//!     // Process data, update data structures
+//!     done = true; // or whatever condition you like
+//!
+//!     {
+//!         let win = term.create_root_window();
+//!         // use win to draw something
+//!     }
+//!     term.present();
+//!
+//! }
+//! ```
 use ndarray::Axis;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion;
@@ -8,12 +34,16 @@ use std::io::{StdoutLock, Write};
 use nix::sys::signal::{kill, pthread_sigmask, SigSet, SigmaskHow, SIGCONT, SIGTSTP};
 use nix::unistd::getpgrp;
 
+/// A type providing an interface to the underlying physical terminal.
+/// This also provides the entry point for any rendering to the terminal buffer.
 pub struct Terminal<'a> {
     values: WindowBuffer,
     terminal: RawTerminal<StdoutLock<'a>>,
 }
 
 impl<'a> Terminal<'a> {
+
+    /// Create a new terminal. The terminal takes control of stdout and performs all output on it.
     pub fn new(stdout: StdoutLock<'a>) -> Self {
         let mut term = Terminal {
             values: WindowBuffer::new(Width::new(0).unwrap(), Height::new(0).unwrap()),
@@ -55,6 +85,7 @@ impl<'a> Terminal<'a> {
         self.setup_terminal().expect("Setup terminal");
     }
 
+    /// Set up the terminal for "full screen" work (i.e., hide cursor, switch to alternate screen).
     fn setup_terminal(&mut self) -> io::Result<()> {
         write!(
             self.terminal,
@@ -66,6 +97,7 @@ impl<'a> Terminal<'a> {
         Ok(())
     }
 
+    /// Restore terminal from "full screen" (i.e., show cursor again, switch to main screen).
     fn restore_terminal(&mut self) -> io::Result<()> {
         write!(
             self.terminal,
@@ -77,6 +109,10 @@ impl<'a> Terminal<'a> {
         Ok(())
     }
 
+    /// Create a root window that covers the whole terminal grid.
+    ///
+    /// Use the buffer to manipulate the current window buffer and use present subsequently to
+    /// write out the buffer to the actual terminal.
     pub fn create_root_window(&mut self) -> Window {
         let (x, y) = termion::terminal_size().expect("get terminal size");
         let x = Width::new(x as i32).unwrap();
@@ -90,6 +126,7 @@ impl<'a> Terminal<'a> {
         self.values.as_window()
     }
 
+    /// Present the current buffer content to the actual terminal.
     pub fn present(&mut self) {
         use std::io::Write;
 
@@ -135,11 +172,14 @@ pub mod test {
     use super::super::{GraphemeCluster, Height, Style, StyledGraphemeCluster, Width, Window,
                        WindowBuffer};
 
+    /// A fake terminal that can be used in tests to create windows and compare the resulting
+    /// contents to the expected contents of windows.
     #[derive(PartialEq)]
     pub struct FakeTerminal {
         values: WindowBuffer,
     }
     impl FakeTerminal {
+        /// Create a window with the specified (width, height).
         pub fn with_size((w, h): (u32, u32)) -> Self {
             FakeTerminal {
                 values: WindowBuffer::new(
@@ -149,16 +189,12 @@ pub mod test {
             }
         }
 
-        /*
-        pub fn size(&self) -> (Ix, Ix) {
-            (self.values.dim().1, self.values.dim().0)
-        }
-        */
 
-        pub fn create_root_window(&mut self) -> Window {
-            self.values.as_window()
-        }
-
+        /// Create a fake terminal from a format string that looks roughly like this:
+        ///
+        /// "1 1 2 2 3 3 4 4"
+        ///
+        /// Spaces and newlines are ignored and the string is coerced into the specified size.
         pub fn from_str(
             (w, h): (u32, u32),
             description: &str,
@@ -177,8 +213,30 @@ pub mod test {
             })
         }
 
+        /// Test if the terminal contents look like the given format string.
+        /// The rows are separated by a "|".
+        ///
+        /// # Examples:
+        ///
+        /// ```
+        /// use unsegen::base::terminal::test::FakeTerminal;
+        /// use unsegen::base::GraphemeCluster;
+        ///
+        /// let mut term = FakeTerminal::with_size((2,3));
+        /// {
+        ///     let mut win = term.create_root_window();
+        ///     win.fill(GraphemeCluster::try_from('_').unwrap());
+        /// }
+        ///
+        /// term.assert_looks_like("__|__|__");
+        /// ```
         pub fn assert_looks_like(&self, string_description: &str) {
             assert_eq!(format!("{:?}", self), string_description);
+        }
+
+        /// Create a root window that covers the whole terminal grid.
+        pub fn create_root_window(&mut self) -> Window {
+            self.values.as_window()
         }
     }
 
