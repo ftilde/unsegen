@@ -5,7 +5,7 @@
 //!
 //! # Examples:
 //!
-//! ```should_panic //tests do not provide a fully functional terminal
+//! ```no_run //tests do not provide a fully functional terminal
 //! use unsegen::base::Terminal;
 //! use std::io::stdout;
 //! let stdout = stdout();
@@ -42,7 +42,6 @@ pub struct Terminal<'a> {
 }
 
 impl<'a> Terminal<'a> {
-
     /// Create a new terminal. The terminal takes control of stdout and performs all output on it.
     pub fn new(stdout: StdoutLock<'a>) -> Self {
         let mut term = Terminal {
@@ -140,7 +139,6 @@ impl<'a> Terminal<'a> {
             ).expect("move cursor");
             let mut buffer = String::with_capacity(line.len());
             for c in line.iter() {
-                //TODO style
                 if c.style != current_style {
                     current_style.set_terminal_attributes(&mut self.terminal);
                     write!(self.terminal, "{}", buffer).expect("write buffer");
@@ -188,7 +186,6 @@ pub mod test {
                 ),
             }
         }
-
 
         /// Create a fake terminal from a format string that looks roughly like this:
         ///

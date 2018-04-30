@@ -1,3 +1,4 @@
+//! Types associated with Windows, i.e., rectangular views into a terminal buffer.
 use super::{CursorTarget, GraphemeCluster, Style, StyleModifier};
 use ndarray::{Array, ArrayViewMut, Axis, Ix, Ix2};
 use std::cmp::max;
@@ -5,6 +6,7 @@ use base::ranges::{Bound, RangeArgument};
 use base::basic_types::*;
 use std::fmt;
 
+/// A GraphemeCluster with an associated style.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StyledGraphemeCluster {
     pub grapheme_cluster: GraphemeCluster,
@@ -12,6 +14,7 @@ pub struct StyledGraphemeCluster {
 }
 
 impl StyledGraphemeCluster {
+    /// Create a StyledGraphemeCluster from its components.
     pub fn new(grapheme_cluster: GraphemeCluster, style: Style) -> Self {
         StyledGraphemeCluster {
             grapheme_cluster: grapheme_cluster,
@@ -26,34 +29,50 @@ impl Default for StyledGraphemeCluster {
     }
 }
 
-pub type CharMatrix = Array<StyledGraphemeCluster, Ix2>;
+pub(in base) type CharMatrix = Array<StyledGraphemeCluster, Ix2>;
 
+/// An owned buffer representing a Window.
 #[derive(PartialEq)]
 pub struct WindowBuffer {
     storage: CharMatrix,
 }
 
 impl WindowBuffer {
+    /// Create a new WindowBuffer with the specified width and height.
     pub fn new(width: Width, height: Height) -> Self {
         WindowBuffer {
             storage: CharMatrix::default(Ix2(height.into(), width.into())),
         }
     }
 
-    pub fn from_storage(storage: CharMatrix) -> Self {
+    /// Create a WindowBuffer directly from a CharMatrix struct.
+    pub(in base) fn from_storage(storage: CharMatrix) -> Self {
         WindowBuffer { storage: storage }
     }
 
+    /// View the WindowBuffer as a Window.
+    /// Use this method if you want to modify the contents of the buffer.
     pub fn as_window<'a>(&'a mut self) -> Window<'a> {
         Window::new(self.storage.view_mut())
     }
 
-    pub fn storage(&self) -> &CharMatrix {
+    /// Get the underlying CharMatrix storage.
+    pub(in base) fn storage(&self) -> &CharMatrix {
         &self.storage
     }
 }
 
 type CharMatrixView<'w> = ArrayViewMut<'w, StyledGraphemeCluster, Ix2>;
+
+/// A rectangular view into a terminal buffer, i.e., a grid of grapheme clusters.
+///
+/// Moreover, a window always has a default style that is applied to all characters that are
+/// written to it. By default this is a "plain" style that does not change color or text format.
+///
+/// Side note: Grapheme clusters do not always have a width of a singular cell, and thus
+/// things can quite complicated. Therefore, Multi-width characters occupy more than once cell in a
+/// single window. If any of the cells is overwritten, potentially left-over cells are overwritten
+/// with space characters.
 pub struct Window<'w> {
     values: CharMatrixView<'w>,
     default_style: Style,
@@ -68,29 +87,53 @@ impl<'w> ::std::fmt::Debug for Window<'w> {
 }
 
 impl<'w> Window<'w> {
-    pub fn new(values: CharMatrixView<'w>) -> Self {
+    /// Create a window from the underlying CharMatrixView and set a default (non-modifying) style.
+    fn new(values: CharMatrixView<'w>) -> Self {
         Window {
             values: values,
             default_style: Style::default(),
         }
     }
 
+    /// Get the width (i.e., number of columns) that the window occupies.
     pub fn get_width(&self) -> Width {
         Width::new(self.values.dim().1 as i32).unwrap()
     }
 
+    /// Get the height (i.e., number of rows) that the window occupies.
     pub fn get_height(&self) -> Height {
         Height::new(self.values.dim().0 as i32).unwrap()
     }
 
-    pub fn clone_mut<'a>(&'a mut self) -> Window<'a> {
-        let mat_view_clone = self.values.view_mut();
-        Window {
-            values: mat_view_clone,
-            default_style: self.default_style,
-        }
-    }
-
+    /// Create a subview of the window.
+    ///
+    /// # Examples:
+    /// ```
+    /// # use unsegen::base::terminal::test::FakeTerminal;
+    /// # let mut term = FakeTerminal::with_size((5,5));
+    /// use unsegen::base::{ColIndex, RowIndex, GraphemeCluster};
+    ///
+    /// let mut win = term.create_root_window();
+    /// {
+    ///     let mut w = win.create_subwindow(
+    ///         ColIndex::new(0) .. ColIndex::new(2),
+    ///         RowIndex::new(2) .. RowIndex::new(4)
+    ///         );
+    ///     w.fill(GraphemeCluster::try_from('A').unwrap());
+    /// }
+    /// {
+    ///     let mut w = win.create_subwindow(
+    ///         ColIndex::new(2) .. ColIndex::new(4),
+    ///         RowIndex::new(0) .. RowIndex::new(2)
+    ///         );
+    ///     w.fill(GraphemeCluster::try_from('B').unwrap());
+    /// }
+    /// ```
+    ///
+    /// # Panics:
+    ///
+    /// Panics on invalid ranges, i.e., if:
+    /// start > end, start < 0, or end > [width of the window]
     pub fn create_subwindow<'a, WX: RangeArgument<ColIndex>, WY: RangeArgument<RowIndex>>(
         &'a mut self,
         x_range: WX,
@@ -122,10 +165,12 @@ impl<'w> Window<'w> {
             x_range_end <= self.get_width().from_origin(),
             "Invalid x_range: end > width"
         );
+        assert!(x_range_start >= 0, "Invalid x_range: start < 0");
         assert!(
             y_range_end <= self.get_height().from_origin(),
             "Invalid y_range: end > height"
         );
+        assert!(y_range_start >= 0, "Invalid y_range: start < 0");
 
         let sub_mat = self.values.slice_mut(s![
             y_range_start.into()..y_range_end.into(),
