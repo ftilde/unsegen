@@ -493,10 +493,15 @@ impl<'a, C: ContainerProvider> Application<'a, C> {
         let active_rect = layout_result.get_rect_with_index(self.active.clone());
 
         for (index, rect) in layout_result.windows {
-            provider.get_mut(&index).draw(
-                window.create_subwindow(rect.x_range, rect.y_range),
-                hints.active(index == self.active),
-            );
+            let hints = if index == self.active {
+                hints
+            } else {
+                hints.active(false)
+            };
+
+            provider
+                .get_mut(&index)
+                .draw(window.create_subwindow(rect.x_range, rect.y_range), hints);
         }
 
         let get_line_type = |x, y, s| {
