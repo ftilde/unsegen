@@ -4,6 +4,7 @@ use ndarray::{Array, ArrayViewMut, Axis, Ix, Ix2};
 use std::cmp::max;
 use base::ranges::{Bound, RangeArgument};
 use base::basic_types::*;
+use base::cursor::{UNBOUNDED_HEIGHT, UNBOUNDED_WIDTH};
 use std::fmt;
 
 /// A GraphemeCluster with an associated style.
@@ -95,14 +96,19 @@ impl<'w> Window<'w> {
         }
     }
 
+    /// Get the extent of the window in the specified dimension (i.e., its width or height)
+    pub fn get_extent<D: AxisDimension>(&self) -> PositiveAxisDiff<D> {
+        PositiveAxisDiff::new(D::get_dimension_value(self.values.dim()) as i32).unwrap()
+    }
+
     /// Get the width (i.e., number of columns) that the window occupies.
     pub fn get_width(&self) -> Width {
-        Width::new(self.values.dim().1 as i32).unwrap()
+        self.get_extent::<ColDimension>()
     }
 
     /// Get the height (i.e., number of rows) that the window occupies.
     pub fn get_height(&self) -> Height {
-        Height::new(self.values.dim().0 as i32).unwrap()
+        self.get_extent::<RowDimension>()
     }
 
     /// Create a subview of the window.
@@ -182,10 +188,40 @@ impl<'w> Window<'w> {
         }
     }
 
-    pub fn split_v(self, split_pos: RowIndex) -> Result<(Self, Self), Self> {
-        if (self.get_height() + Height::new(1).unwrap()).origin_range_contains(split_pos) {
-            let (first_mat, second_mat) =
-                self.values.split_at(Axis(0), split_pos.raw_value() as Ix);
+    /// Split the window horizontally or vertically into two halves.
+    ///
+    /// If the split position is invalid (i.e., larger than the height/width of the window or
+    /// negative), the original window is returned untouched as the error value. split_pos defines
+    /// the first row of the second window.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    ///
+    /// let mut wb = WindowBuffer::new(Width::new(5).unwrap(), Height::new(5).unwrap());
+    /// {
+    ///     let win = wb.as_window();
+    ///     let (w1, w2) = win.split(RowIndex::new(3)).unwrap();
+    ///     assert_eq!(w1.get_height(), Height::new(3).unwrap());
+    ///     assert_eq!(w1.get_width(), Width::new(5).unwrap());
+    ///     assert_eq!(w2.get_height(), Height::new(2).unwrap());
+    ///     assert_eq!(w2.get_width(), Width::new(5).unwrap());
+    /// }
+    /// {
+    ///     let win = wb.as_window();
+    ///     let (w1, w2) = win.split(ColIndex::new(3)).unwrap();
+    ///     assert_eq!(w1.get_height(), Height::new(5).unwrap());
+    ///     assert_eq!(w1.get_width(), Width::new(3).unwrap());
+    ///     assert_eq!(w2.get_height(), Height::new(5).unwrap());
+    ///     assert_eq!(w2.get_width(), Width::new(2).unwrap());
+    /// }
+    /// ```
+    pub fn split<D: AxisDimension>(self, split_pos: AxisIndex<D>) -> Result<(Self, Self), Self> {
+        if (self.get_extent() + PositiveAxisDiff::<D>::new(1).unwrap())
+            .origin_range_contains(split_pos)
+        {
+            let (first_mat, second_mat) = self.values
+                .split_at(Axis(D::NDARRAY_AXIS_NUMBER), split_pos.raw_value() as Ix);
             let w_u = Window {
                 values: first_mat,
                 default_style: self.default_style,
@@ -200,24 +236,22 @@ impl<'w> Window<'w> {
         }
     }
 
-    pub fn split_h(self, split_pos: ColIndex) -> Result<(Self, Self), Self> {
-        if (self.get_width() + Width::new(1).unwrap()).origin_range_contains(split_pos) {
-            let (first_mat, second_mat) =
-                self.values.split_at(Axis(1), split_pos.raw_value() as Ix);
-            let w_l = Window {
-                values: first_mat,
-                default_style: self.default_style,
-            };
-            let w_r = Window {
-                values: second_mat,
-                default_style: self.default_style,
-            };
-            Ok((w_l, w_r))
-        } else {
-            Err(self)
-        }
-    }
-
+    /// Fill the window with the specified GraphemeCluster.
+    ///
+    /// The style is defined by the default style of the window.
+    /// If the grapheme cluster is wider than 1 cell, any left over cells are filled with space
+    /// characters.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    /// let mut wb = WindowBuffer::new(Width::new(5).unwrap(), Height::new(5).unwrap());
+    /// wb.as_window().fill(GraphemeCluster::try_from('X').unwrap());
+    /// // Every cell of wb now contains an 'X'.
+    ///
+    /// wb.as_window().fill(GraphemeCluster::try_from('山').unwrap());
+    /// // Every row of wb now contains two '山', while the last column cotains spaces.
+    /// ```
     pub fn fill(&mut self, c: GraphemeCluster) {
         let cluster_width = c.width();
         let template = StyledGraphemeCluster::new(c, self.default_style);
@@ -236,18 +270,63 @@ impl<'w> Window<'w> {
         }
     }
 
+    /// Fill the window with space characters.
+    ///
+    /// The style (i.e., the background color) is defined by the default style of the window.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    /// let mut wb = WindowBuffer::new(Width::new(5).unwrap(), Height::new(5).unwrap());
+    /// wb.as_window().clear();
+    /// // Every cell of wb now contains a ' '.
+    /// ```
     pub fn clear(&mut self) {
         self.fill(GraphemeCluster::space());
     }
 
+    /// Specify the new default style of the window. This style will be applied to all grapheme
+    /// clusters written to the window.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    /// let mut wb = WindowBuffer::new(Width::new(5).unwrap(), Height::new(5).unwrap());
+    /// let mut win = wb.as_window();
+    /// win.set_default_style(Style::new(Color::Red, Color::Blue, TextFormat::default()));
+    /// win.clear();
+    /// // wb is now cleared an has a blue background.
+    /// ```
     pub fn set_default_style(&mut self, style: Style) {
         self.default_style = style;
     }
 
+    /// Specify the new default style of the window. This style will be applied to all grapheme
+    /// clusters written to the window.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    /// let mut wb = WindowBuffer::new(Width::new(5).unwrap(), Height::new(5).unwrap());
+    /// let mut win = wb.as_window();
+    /// win.set_default_style(Style::new(Color::Red, Color::Blue, TextFormat::default()));
+    /// win.clear();
+    /// // wb is now cleared an has a blue background.
+    ///
+    /// win.modify_default_style(&StyleModifier::new().bg_color(Color::Yellow));
+    /// win.clear();
+    /// // wb is now cleared an has a yellow background.
+    ///
+    /// assert_eq!(win.default_style(),
+    ///     &Style::new(Color::Red, Color::Yellow, TextFormat::default()))
+    /// ```
     pub fn modify_default_style(&mut self, modifier: &StyleModifier) {
         modifier.modify(&mut self.default_style);
     }
 
+    /// Get the current default style of the window.
+    ///
+    /// Change the default style using modify_default_style or set_default_style.
     pub fn default_style(&self) -> &Style {
         &self.default_style
     }
@@ -283,6 +362,11 @@ impl<'a> CursorTarget for Window<'a> {
     }
 }
 
+/// A dummy window that does not safe any of the content written to it, but records the maximal
+/// coordinates used.
+///
+/// This is therefore suitable for determining the required space demand of a
+/// widget if nothing or not enough is known about the content of a widget.
 pub struct ExtentEstimationWindow {
     some_value: StyledGraphemeCluster,
     default_style: Style,
@@ -291,13 +375,8 @@ pub struct ExtentEstimationWindow {
     extent_y: Height,
 }
 
-//FIXME: compile time evaluation, see https://github.com/rust-lang/rust/issues/24111
-//pub const UNBOUNDED_WIDTH: Width = Width::new(2147483647).unwrap();//i32::max_value() as u32;
-//pub const UNBOUNDED_HEIGHT: Height = Height::new(2147483647).unwrap();//i32::max_value() as u32;
-pub const UNBOUNDED_WIDTH: i32 = 2147483647; //i32::max_value() as u32;
-pub const UNBOUNDED_HEIGHT: i32 = 2147483647; //i32::max_value() as u32;
-
 impl ExtentEstimationWindow {
+    /// Create an ExtentEstimationWindow with a fixed width
     pub fn with_width(width: Width) -> Self {
         let style = Style::default();
         ExtentEstimationWindow {
@@ -309,14 +388,17 @@ impl ExtentEstimationWindow {
         }
     }
 
+    /// Create an ExtentEstimationWindow with an unbounded width
     pub fn unbounded() -> Self {
         Self::with_width(Width::new(UNBOUNDED_WIDTH).unwrap())
     }
 
+    /// Get the width of the window required to display the contents written to the window.
     pub fn extent_x(&self) -> Width {
         self.extent_x
     }
 
+    /// Get the height of the window required to display the contents written to the window.
     pub fn extent_y(&self) -> Height {
         self.extent_y
     }

@@ -488,17 +488,36 @@ impl<T: AxisDimension> From<usize> for PositiveAxisDiff<T> {
 // ----------------------------------------------------------------------------
 
 /// Trait for all dimensions of a terminal grid. See RowDimension and ColDimension.
-pub trait AxisDimension: Copy {}
+/// You probably do not want to implement this trait yourself.
+pub trait AxisDimension: Copy {
+    /// The equivalent ndarray dimension. (Used in `Axis(...)`)
+    const NDARRAY_AXIS_NUMBER: usize;
+
+    /// Get the value corresponding to this dimension from the tuple.
+    fn get_dimension_value(val: (usize, usize)) -> usize;
+}
 
 /// The horizontal (i.e., x-) dimension of a terminal grid. See ColIndex, ColDiff, and Width.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ColDimension;
-impl AxisDimension for ColDimension {}
+impl AxisDimension for ColDimension {
+    const NDARRAY_AXIS_NUMBER: usize = 1;
+
+    fn get_dimension_value(val: (usize, usize)) -> usize {
+        val.1
+    }
+}
 
 /// The vertical (i.e., y-) dimension of a terminal grid. See RowIndex, RowDiff and Height.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RowDimension;
-impl AxisDimension for RowDimension {}
+impl AxisDimension for RowDimension {
+    const NDARRAY_AXIS_NUMBER: usize = 0;
+
+    fn get_dimension_value(val: (usize, usize)) -> usize {
+        val.0
+    }
+}
 
 /// An AxisIndex in x-dimension.
 pub type ColIndex = AxisIndex<ColDimension>;

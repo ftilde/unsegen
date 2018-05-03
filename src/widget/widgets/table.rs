@@ -186,8 +186,7 @@ impl<R: TableRow + 'static> Widget for Table<R> {
                 break;
             }
             let height = row.height_demand().min;
-            let (mut row_window, rest_window) = match window.unwrap().split_v(height.from_origin())
-            {
+            let (mut row_window, rest_window) = match window.unwrap().split(height.from_origin()) {
                 Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
                 Err(row_window) => (row_window, None),
             };
@@ -206,7 +205,7 @@ impl<R: TableRow + 'static> Widget for Table<R> {
                 .peekable();
             while let Some((col_index, (col, &pos))) = iter.next() {
                 let (mut cell_window, r) = row_window
-                    .split_h(pos.from_origin())
+                    .split(pos.from_origin())
                     .expect("valid split pos from layout");
                 row_window = r;
 
@@ -230,7 +229,7 @@ impl<R: TableRow + 'static> Widget for Table<R> {
                 {
                     if row_window.get_width() > 0 {
                         let (mut sep_window, r) = row_window
-                            .split_h(Width::from(c.width()).from_origin())
+                            .split(Width::from(c.width()).from_origin())
                             .expect("valid split pos from layout");
                         row_window = r;
                         sep_window.fill(c.clone());
@@ -243,7 +242,7 @@ impl<R: TableRow + 'static> Widget for Table<R> {
                     break;
                 }
                 let (mut sep_window, rest_window) =
-                    match window.unwrap().split_v(height.from_origin()) {
+                    match window.unwrap().split(height.from_origin()) {
                         Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
                         Err(row_window) => (row_window, None),
                     };

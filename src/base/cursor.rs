@@ -21,6 +21,16 @@ pub trait CursorTarget {
     fn get_default_style(&self) -> &Style;
 }
 
+//FIXME: compile time evaluation, see https://github.com/rust-lang/rust/issues/24111
+//pub const UNBOUNDED_WIDTH: Width = Width::new(2147483647).unwrap();//i32::max_value() as u32;
+//pub const UNBOUNDED_HEIGHT: Height = Height::new(2147483647).unwrap();//i32::max_value() as u32;
+/// A symbolic value that can be used to specify that a cursor target does not have a maximum
+/// width.
+pub const UNBOUNDED_WIDTH: i32 = 2147483647; //i32::max_value() as u32;
+/// A symbolic value that can be used to specify that a cursor target does not have a maximum
+/// height.
+pub const UNBOUNDED_HEIGHT: i32 = 2147483647; //i32::max_value() as u32;
+
 pub struct CursorState {
     wrapping_mode: WrappingMode,
     style_modifier: StyleModifier,
