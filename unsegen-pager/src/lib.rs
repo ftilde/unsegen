@@ -163,11 +163,10 @@ where
         self.content = Some(content);
 
         // Go back to last available line
-        let mut new_current_line = self.current_line;
-        while !self.line_exists(new_current_line) {
-            new_current_line -= 1;
+        let current_line = self.current_line;
+        if !self.line_exists(current_line) {
+            let _ = self.scroll_to_end();
         }
-        self.current_line = new_current_line;
     }
 
     fn line_exists<I: Into<LineIndex>>(&mut self, line: I) -> bool {
