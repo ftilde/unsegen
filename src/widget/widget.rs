@@ -43,7 +43,7 @@ pub struct RenderingHints {
 impl Default for RenderingHints {
     fn default() -> Self {
         RenderingHints {
-            active: false,
+            active: true,
             blink: Blink::On,
             _do_not_construct: (),
         }
