@@ -252,7 +252,7 @@ where
             )[0];
 
             let (mut decoration_window, mut content_window) = window
-                .split_h(split_pos.from_origin())
+                .split(split_pos.from_origin())
                 .expect("valid split pos");
 
             // Fill background with correct color
