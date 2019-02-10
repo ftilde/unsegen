@@ -12,6 +12,7 @@ use unsegen::widget::{Demand, Demand2D, RenderingHints};
 use index;
 use std::cmp::{max, min};
 use std::fmt::Write;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
 struct Line {
@@ -364,7 +365,48 @@ macro_rules! trace_ansi {
     }};
 }
 
-impl Handler for TerminalWindow {
+enum BufferMode {
+    Main,
+    Alternate,
+}
+
+pub struct DualWindow {
+    main: TerminalWindow,
+    alternate: TerminalWindow,
+    mode: BufferMode,
+}
+
+impl DualWindow {
+    pub fn new() -> Self {
+        DualWindow {
+            main: TerminalWindow::new(),
+            alternate: TerminalWindow::new(),
+            mode: BufferMode::Main,
+        }
+    }
+}
+
+impl Deref for DualWindow {
+    type Target = TerminalWindow;
+
+    fn deref(&self) -> &Self::Target {
+        match self.mode {
+            BufferMode::Main => &self.main,
+            BufferMode::Alternate => &self.alternate,
+        }
+    }
+}
+
+impl DerefMut for DualWindow {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self.mode {
+            BufferMode::Main => &mut self.main,
+            BufferMode::Alternate => &mut self.alternate,
+        }
+    }
+}
+
+impl Handler for DualWindow {
     /// OSC to set window title
     fn set_title(&mut self, _: &str) {
         //TODO: (Although this might not make sense to implement. Do we want to display a title?)
@@ -752,6 +794,7 @@ impl Handler for TerminalWindow {
                 self.show_cursor = true;
                 trace_ansi!("set_mode {:?}", mode);
             }
+            ansi::Mode::SwapScreenAndSetRestoreCursor => self.mode = BufferMode::Alternate,
             _ => {
                 warn_unimplemented!("set_mode {:?}", mode);
             }
@@ -765,6 +808,7 @@ impl Handler for TerminalWindow {
                 self.show_cursor = false;
                 trace_ansi!("set_mode {:?}", mode);
             }
+            ansi::Mode::SwapScreenAndSetRestoreCursor => self.mode = BufferMode::Main,
             _ => {
                 warn_unimplemented!("set_mode {:?}", mode);
             }
@@ -820,7 +864,7 @@ impl Handler for TerminalWindow {
     }
 }
 
-impl TermInfo for TerminalWindow {
+impl TermInfo for DualWindow {
     fn lines(&self) -> index::Line {
         index::Line(self.get_height().raw_value() as usize) //TODO: is this even correct? do we want 'unbounded'?
     }
@@ -829,7 +873,7 @@ impl TermInfo for TerminalWindow {
     }
 }
 
-impl Scrollable for TerminalWindow {
+impl Scrollable for DualWindow {
     fn scroll_forwards(&mut self) -> OperationResult {
         let current = self.current_scrollback_pos();
         let candidate = current + self.scroll_step;

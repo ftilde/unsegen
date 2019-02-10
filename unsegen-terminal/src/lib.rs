@@ -18,7 +18,7 @@ use unsegen::container::Container;
 use unsegen::input::{Behavior, Input, Key, OperationResult, ScrollBehavior, Scrollable, Writable};
 use unsegen::widget::{Demand2D, RenderingHints, Widget};
 
-use terminalwindow::TerminalWindow;
+use terminalwindow::DualWindow;
 
 use std::cell::RefCell;
 use std::fs::File;
@@ -58,7 +58,7 @@ impl<'a> Behavior for PassthroughBehavior<'a> {
 }
 
 pub struct Terminal {
-    terminal_window: RefCell<TerminalWindow>,
+    terminal_window: RefCell<DualWindow>,
     //slave_input_thread: thread::Thread,
     master_input_sink: RefCell<PTYInput>,
 
@@ -98,7 +98,7 @@ impl Terminal {
         write!(pts, "").expect("initial write to pts");
 
         Terminal {
-            terminal_window: RefCell::new(TerminalWindow::new()),
+            terminal_window: RefCell::new(DualWindow::new()),
             master_input_sink: RefCell::new(pty_input),
             //slave_input_thread: slave_input_thread,
             _slave_handle: pts,
