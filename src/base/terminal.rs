@@ -39,6 +39,7 @@ use nix::unistd::getpgrp;
 pub struct Terminal<'a> {
     values: WindowBuffer,
     terminal: RawTerminal<StdoutLock<'a>>,
+    size_has_changed_since_last_present: bool,
 }
 
 impl<'a> Terminal<'a> {
@@ -47,6 +48,7 @@ impl<'a> Terminal<'a> {
         let mut term = Terminal {
             values: WindowBuffer::new(Width::new(0).unwrap(), Height::new(0).unwrap()),
             terminal: stdout.into_raw_mode().expect("raw terminal"),
+            size_has_changed_since_last_present: true,
         };
         term.setup_terminal().expect("Setup terminal");
         term
@@ -117,7 +119,8 @@ impl<'a> Terminal<'a> {
         let x = Width::new(x as i32).unwrap();
         let y = Height::new(y as i32).unwrap();
         if x != self.values.as_window().get_width() || y != self.values.as_window().get_height() {
-            self.values = WindowBuffer::new(x, y)
+            self.size_has_changed_since_last_present = true;
+            self.values = WindowBuffer::new(x, y);
         } else {
             self.values.as_window().clear();
         }
@@ -131,6 +134,10 @@ impl<'a> Terminal<'a> {
 
         let mut current_style = Style::default();
 
+        if self.size_has_changed_since_last_present {
+            write!(self.terminal, "{}", termion::clear::All).expect("clear");
+            self.size_has_changed_since_last_present = false;
+        }
         for (y, line) in self.values.storage().axis_iter(Axis(0)).enumerate() {
             write!(
                 self.terminal,
