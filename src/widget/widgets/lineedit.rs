@@ -1,8 +1,10 @@
-use widget::{count_grapheme_clusters, text_width, Blink, Demand, Demand2D, RenderingHints, Widget};
-use base::{Cursor, ModifyMode, StyleModifier, Window};
 use base::basic_types::*;
+use base::{BoolModifyMode, Cursor, StyleModifier, Window};
 use input::{Editable, Navigatable, OperationResult, Writable};
 use unicode_segmentation::UnicodeSegmentation;
+use widget::{
+    count_grapheme_clusters, text_width, Blink, Demand, Demand2D, RenderingHints, Widget,
+};
 
 pub struct LineEdit {
     text: String,
@@ -15,7 +17,7 @@ pub struct LineEdit {
 impl LineEdit {
     pub fn new() -> Self {
         Self::with_cursor_styles(
-            StyleModifier::new().invert(ModifyMode::Toggle),
+            StyleModifier::new().invert(BoolModifyMode::Toggle),
             StyleModifier::new(),
             StyleModifier::new().underline(true),
         )
@@ -85,7 +87,8 @@ impl LineEdit {
 
     fn erase_symbol_at(&mut self, pos: usize) -> Result<(), ()> {
         if pos < self.text.len() {
-            self.text = self.text
+            self.text = self
+                .text
                 .graphemes(true)
                 .enumerate()
                 .filter_map(|(i, s)| if i != pos { Some(s) } else { None })

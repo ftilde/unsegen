@@ -1,19 +1,21 @@
 extern crate syntect;
 extern crate unsegen;
 
-mod highlighting;
 mod decorating;
+mod highlighting;
 
-pub use highlighting::*;
 pub use decorating::*;
+pub use highlighting::*;
 
 pub use syntect::highlighting::{Theme, ThemeSet};
 pub use syntect::parsing::{SyntaxDefinition, SyntaxSet};
 
-use unsegen::base::{Cursor, GraphemeCluster, ModifyMode, StyleModifier, Window, WrappingMode,
-                    basic_types::*, ranges::*};
-use unsegen::widget::{layout_linearly, Demand, Demand2D, RenderingHints, Widget};
+use unsegen::base::{
+    basic_types::*, ranges::*, BoolModifyMode, Cursor, GraphemeCluster, StyleModifier, Window,
+    WrappingMode,
+};
 use unsegen::input::{OperationResult, Scrollable};
+use unsegen::widget::{layout_linearly, Demand, Demand2D, RenderingHints, Widget};
 
 use std::cmp::{max, min};
 
@@ -235,7 +237,8 @@ where
             // TODO: make this configurable?
             let min_highlight_context = 40;
             let num_adjacent_lines_to_load = max(height.into(), min_highlight_context / 2);
-            let min_line = self.current_line
+            let min_line = self
+                .current_line
                 .checked_sub(num_adjacent_lines_to_load)
                 .unwrap_or(LineIndex::new(0));
             let max_line = self.current_line + num_adjacent_lines_to_load;
@@ -291,7 +294,9 @@ where
             for (line_index, line) in content.view(min_line..max_line) {
                 let line_content = line.get_content();
                 let base_style = if line_index == self.current_line {
-                    StyleModifier::new().invert(ModifyMode::Toggle).bold(true)
+                    StyleModifier::new()
+                        .invert(BoolModifyMode::Toggle)
+                        .bold(true)
                 } else {
                     StyleModifier::none()
                 };

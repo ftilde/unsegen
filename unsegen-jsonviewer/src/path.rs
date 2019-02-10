@@ -160,7 +160,8 @@ impl Path {
                     if let Some(new_sub_path) = subpath.find_next_path(&obj.members[&key]) {
                         Some(Path::Object(ObjectPath::Item(key, Box::new(new_sub_path))))
                     } else {
-                        if let Some((first_key, first_val)) = obj.members
+                        if let Some((first_key, first_val)) = obj
+                            .members
                             .iter()
                             .skip_while(|&(k, _)| *k != key)
                             .skip(1)
@@ -213,14 +214,16 @@ impl Path {
                         }
                     }
                 }
-                (ArrayPath::Shrink, true) => Some(Path::Array(if let (true, Some(first)) = (
-                    array.num_extended > 0,
-                    array.values.iter().nth(array.num_extended - 1),
-                ) {
-                    ArrayPath::Item(array.num_extended - 1, Box::new(last_path_in(&*first)))
-                } else {
-                    ArrayPath::Toggle
-                })),
+                (ArrayPath::Shrink, true) => Some(Path::Array(
+                    if let (true, Some(first)) = (
+                        array.num_extended > 0,
+                        array.values.iter().nth(array.num_extended - 1),
+                    ) {
+                        ArrayPath::Item(array.num_extended - 1, Box::new(last_path_in(&*first)))
+                    } else {
+                        ArrayPath::Toggle
+                    },
+                )),
                 (ArrayPath::Grow, true) => Some(Path::Array(if array.can_shrink() {
                     ArrayPath::Shrink
                 } else {
@@ -236,7 +239,8 @@ impl Path {
                     if let Some(new_sub_path) = subpath.find_previous_path(&obj.members[&key]) {
                         Some(Path::Object(ObjectPath::Item(key, Box::new(new_sub_path))))
                     } else {
-                        if let Some((last_key, last_val)) = obj.members
+                        if let Some((last_key, last_val)) = obj
+                            .members
                             .iter()
                             .rev()
                             .skip_while(|&(k, _)| *k != key)
@@ -382,9 +386,9 @@ mod test {
     fn test_first_path_in() {
         aeq_first_path_in(JsonValue::String("foo".to_string()), Path::Scalar);
 
-        aeq_first_path_in(object!{ "bar" => "b", "foo" => "f"}, Path::object_toggle());
+        aeq_first_path_in(object! { "bar" => "b", "foo" => "f"}, Path::object_toggle());
 
-        aeq_first_path_in(array!{ 0, 1, 2, 3, 4}, Path::array_toggle());
+        aeq_first_path_in(array! { 0, 1, 2, 3, 4}, Path::array_toggle());
     }
 
     fn aeq_last_path_in(val: JsonValue, expected: Path) {
@@ -397,15 +401,15 @@ mod test {
     fn test_last_path_in() {
         aeq_last_path_in(JsonValue::String("foo".to_string()), Path::Scalar);
 
-        aeq_last_path_in(object!{}, Path::object_toggle());
+        aeq_last_path_in(object! {}, Path::object_toggle());
         aeq_last_path_in(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::scalar().object("foo"),
         );
 
-        aeq_last_path_in(array!{ 0, 1, 2, 3, 4}, Path::array_grow());
-        aeq_last_path_in(array!{ 0, 1, 2}, Path::array_shrink());
-        aeq_last_path_in(array!{}, Path::array_toggle());
+        aeq_last_path_in(array! { 0, 1, 2, 3, 4}, Path::array_grow());
+        aeq_last_path_in(array! { 0, 1, 2}, Path::array_shrink());
+        aeq_last_path_in(array! {}, Path::array_toggle());
     }
 
     fn aeq_next_path_setup<P: Into<Option<Path>>, S: FnOnce(&mut DisplayValue)>(
@@ -430,23 +434,23 @@ mod test {
         aeq_next_path(JsonValue::String("foo".to_string()), Path::scalar(), None);
 
         aeq_next_path(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::object_toggle(),
             Path::scalar().object("bar"),
         );
         aeq_next_path(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::scalar().object("bar"),
             Path::scalar().object("foo"),
         );
         aeq_next_path(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::scalar().object("foo"),
             None,
         );
 
         aeq_next_path_setup(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             |o| o.unwrap_object_ref_mut().toggle_visibility(),
             Path::object_toggle(),
             None,
@@ -454,67 +458,67 @@ mod test {
 
         // Can grow/shrink
         aeq_next_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::array_toggle(),
             Path::scalar().array(0),
         );
         aeq_next_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::scalar().array(0),
             Path::scalar().array(1),
         );
         aeq_next_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::scalar().array(1),
             Path::scalar().array(2),
         );
         aeq_next_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::scalar().array(2),
             Path::array_shrink(),
         );
         aeq_next_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::array_shrink(),
             Path::array_grow(),
         );
-        aeq_next_path(array!{ 0, 1, 2, 3, 4}, Path::array_grow(), None);
+        aeq_next_path(array! { 0, 1, 2, 3, 4}, Path::array_grow(), None);
 
         // Cannot grow
         aeq_next_path(
-            array!{ 0, 1, 2},
+            array! { 0, 1, 2},
             Path::array_toggle(),
             Path::scalar().array(0),
         );
         aeq_next_path(
-            array!{ 0, 1, 2},
+            array! { 0, 1, 2},
             Path::scalar().array(0),
             Path::scalar().array(1),
         );
         aeq_next_path(
-            array!{ 0, 1, 2},
+            array! { 0, 1, 2},
             Path::scalar().array(1),
             Path::scalar().array(2),
         );
         aeq_next_path(
-            array!{ 0, 1, 2},
+            array! { 0, 1, 2},
             Path::scalar().array(2),
             Path::array_shrink(),
         );
-        aeq_next_path(array!{ 0, 1, 2}, Path::array_shrink(), None);
+        aeq_next_path(array! { 0, 1, 2}, Path::array_shrink(), None);
 
         // Cannot shrink
-        aeq_next_path(array!{}, Path::array_toggle(), None);
+        aeq_next_path(array! {}, Path::array_toggle(), None);
 
         aeq_next_path_setup(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             |a| a.unwrap_array_ref_mut().toggle_visibility(),
             Path::array_toggle(),
             None,
         );
 
         aeq_next_path(
-            object!{ "bar" => array!{ 1 }, "foo" => "f"},
+            object! { "bar" => array!{ 1 }, "foo" => "f"},
             Path::array_shrink().object("bar"),
             Path::scalar().object("foo"),
         );
@@ -542,91 +546,91 @@ mod test {
         aeq_previous_path(JsonValue::String("foo".to_string()), Path::scalar(), None);
 
         aeq_previous_path(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::object_toggle(),
             None,
         );
         aeq_previous_path(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::scalar().object("bar"),
             Path::object_toggle(),
         );
         aeq_previous_path(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::scalar().object("foo"),
             Path::scalar().object("bar"),
         );
 
         aeq_previous_path_setup(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             |o| o.unwrap_object_ref_mut().toggle_visibility(),
             Path::object_toggle(),
             None,
         );
 
         // Can grow/shrink
-        aeq_previous_path(array!{ 0, 1, 2, 3, 4}, Path::array_toggle(), None);
+        aeq_previous_path(array! { 0, 1, 2, 3, 4}, Path::array_toggle(), None);
         aeq_previous_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::scalar().array(0),
             Path::array_toggle(),
         );
         aeq_previous_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::scalar().array(1),
             Path::scalar().array(0),
         );
         aeq_previous_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::scalar().array(2),
             Path::scalar().array(1),
         );
         aeq_previous_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::array_shrink(),
             Path::scalar().array(2),
         );
         aeq_previous_path(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::array_grow(),
             Path::array_shrink(),
         );
 
         // Cannot grow
-        aeq_previous_path(array!{ 0, 1, 2}, Path::array_toggle(), None);
+        aeq_previous_path(array! { 0, 1, 2}, Path::array_toggle(), None);
         aeq_previous_path(
-            array!{ 0, 1, 2},
+            array! { 0, 1, 2},
             Path::scalar().array(0),
             Path::array_toggle(),
         );
         aeq_previous_path(
-            array!{ 0, 1, 2},
+            array! { 0, 1, 2},
             Path::scalar().array(1),
             Path::scalar().array(0),
         );
         aeq_previous_path(
-            array!{ 0, 1, 2},
+            array! { 0, 1, 2},
             Path::scalar().array(2),
             Path::scalar().array(1),
         );
         aeq_previous_path(
-            array!{ 0, 1, 2},
+            array! { 0, 1, 2},
             Path::array_shrink(),
             Path::scalar().array(2),
         );
 
         // Cannot shrink
-        aeq_previous_path(array!{}, Path::array_toggle(), None);
+        aeq_previous_path(array! {}, Path::array_toggle(), None);
 
         aeq_previous_path_setup(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             |a| a.unwrap_array_ref_mut().toggle_visibility(),
             Path::array_toggle(),
             None,
         );
 
         aeq_previous_path(
-            object!{ "bar" => array!{ 1 }, "foo" => "f"},
+            object! { "bar" => array!{ 1 }, "foo" => "f"},
             Path::scalar().object("foo"),
             Path::array_shrink().object("bar"),
         );
@@ -653,53 +657,55 @@ mod test {
         );
 
         aeq_find_and_act_on_element(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::array_grow(),
             |v| v.unwrap_array_ref().num_extended == 4,
             false,
         );
         aeq_find_and_act_on_element(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::array_shrink(),
             |v| v.unwrap_array_ref().num_extended == 2,
             false,
         );
         aeq_find_and_act_on_element(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::array_toggle(),
             |v| !v.unwrap_array_ref().extended,
             false,
         );
 
         aeq_find_and_act_on_element(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::object_toggle(),
             |v| !v.unwrap_object_ref().extended,
             false,
         );
 
         aeq_find_and_act_on_element(
-            object!{ "bar" => array!{0, 1, 2, 3, 4}, "foo" => "f"},
+            object! { "bar" => array!{0, 1, 2, 3, 4}, "foo" => "f"},
             Path::array_grow().object("bar"),
             |v| {
                 v.unwrap_object_ref().members["bar"]
                     .unwrap_array_ref()
-                    .num_extended == 4
+                    .num_extended
+                    == 4
             },
             false,
         );
         aeq_find_and_act_on_element(
-            object!{ "bar" => array!{0, 1, 2, 3, 4}, "foo" => "f"},
+            object! { "bar" => array!{0, 1, 2, 3, 4}, "foo" => "f"},
             Path::array_shrink().object("bar"),
             |v| {
                 v.unwrap_object_ref().members["bar"]
                     .unwrap_array_ref()
-                    .num_extended == 2
+                    .num_extended
+                    == 2
             },
             false,
         );
         aeq_find_and_act_on_element(
-            object!{ "bar" => array!{0, 1, 2, 3, 4}, "foo" => "f"},
+            object! { "bar" => array!{0, 1, 2, 3, 4}, "foo" => "f"},
             Path::array_toggle().object("bar"),
             |v| {
                 !v.unwrap_object_ref().members["bar"]
@@ -710,7 +716,7 @@ mod test {
         );
 
         aeq_find_and_act_on_element(
-            array!{ object!{ "bar" => "b", "foo" => "f"}, 1, 2, 3},
+            array! { object!{ "bar" => "b", "foo" => "f"}, 1, 2, 3},
             Path::object_toggle().array(0),
             |v| !v.unwrap_array_ref().values[0].unwrap_object_ref().extended,
             false,
@@ -753,29 +759,33 @@ mod test {
         );
 
         aeq_fix_path_for_value(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::object_toggle(),
             Path::array_toggle(),
         );
         aeq_fix_path_for_value(
-            array!{ 0, 1, 2, 3, 4},
+            array! { 0, 1, 2, 3, 4},
             Path::array_toggle(),
             Path::array_toggle(),
         );
-        aeq_fix_path_for_value(array!{ 0, 1, 2, 3, 4}, Path::scalar(), Path::array_toggle());
+        aeq_fix_path_for_value(
+            array! { 0, 1, 2, 3, 4},
+            Path::scalar(),
+            Path::array_toggle(),
+        );
 
         aeq_fix_path_for_value(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::object_toggle(),
             Path::object_toggle(),
         );
         aeq_fix_path_for_value(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::array_toggle(),
             Path::object_toggle(),
         );
         aeq_fix_path_for_value(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::scalar(),
             Path::object_toggle(),
         );
@@ -783,7 +793,7 @@ mod test {
         // More complex behavior
         // Arrays:
         aeq_fix_path_for_value_setup(
-            array!{ 1, 2, 3},
+            array! { 1, 2, 3},
             |a| {
                 a.unwrap_array_ref_mut().extended = false;
             },
@@ -791,7 +801,7 @@ mod test {
             Path::array_toggle(),
         );
         aeq_fix_path_for_value_setup(
-            array!{ 1, 2, 3},
+            array! { 1, 2, 3},
             |a| {
                 a.unwrap_array_ref_mut().extended = false;
             },
@@ -799,7 +809,7 @@ mod test {
             Path::array_toggle(),
         );
         aeq_fix_path_for_value_setup(
-            array!{ 1, 2, 3},
+            array! { 1, 2, 3},
             |a| {
                 a.unwrap_array_ref_mut().extended = false;
             },
@@ -807,7 +817,7 @@ mod test {
             Path::array_toggle(),
         );
         aeq_fix_path_for_value_setup(
-            array!{ 1, 2, 3},
+            array! { 1, 2, 3},
             |a| {
                 a.unwrap_array_ref_mut().extended = false;
             },
@@ -815,9 +825,9 @@ mod test {
             Path::array_toggle(),
         );
 
-        aeq_fix_path_for_value(array!{}, Path::scalar().array(1), Path::array_toggle());
+        aeq_fix_path_for_value(array! {}, Path::scalar().array(1), Path::array_toggle());
         aeq_fix_path_for_value_setup(
-            array!{ 1, 2, 3},
+            array! { 1, 2, 3},
             |a| {
                 a.unwrap_array_ref_mut().num_extended = 0;
             },
@@ -825,46 +835,46 @@ mod test {
             Path::array_grow(),
         );
 
-        aeq_fix_path_for_value(array!{ 0, 1, 2, 3}, Path::array_grow(), Path::array_grow());
-        aeq_fix_path_for_value(array!{ 0, 1}, Path::array_grow(), Path::array_shrink());
-        aeq_fix_path_for_value(array!{}, Path::array_grow(), Path::array_toggle());
+        aeq_fix_path_for_value(array! { 0, 1, 2, 3}, Path::array_grow(), Path::array_grow());
+        aeq_fix_path_for_value(array! { 0, 1}, Path::array_grow(), Path::array_shrink());
+        aeq_fix_path_for_value(array! {}, Path::array_grow(), Path::array_toggle());
 
         aeq_fix_path_for_value(
-            array!{ 0, 1, 2, 3},
+            array! { 0, 1, 2, 3},
             Path::array_shrink(),
             Path::array_shrink(),
         );
         aeq_fix_path_for_value_setup(
-            array!{ 0, 1},
+            array! { 0, 1},
             |a| {
                 a.unwrap_array_ref_mut().num_extended = 0;
             },
             Path::array_shrink(),
             Path::array_grow(),
         );
-        aeq_fix_path_for_value(array!{}, Path::array_shrink(), Path::array_toggle());
+        aeq_fix_path_for_value(array! {}, Path::array_shrink(), Path::array_toggle());
 
         // Objects:
         aeq_fix_path_for_value_setup(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             |o| o.unwrap_object_ref_mut().extended = false,
             Path::object_toggle(),
             Path::object_toggle(),
         );
         aeq_fix_path_for_value_setup(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             |o| o.unwrap_object_ref_mut().extended = false,
             Path::scalar().object("foo"),
             Path::object_toggle(),
         );
 
         aeq_fix_path_for_value(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::scalar().object("foo"),
             Path::scalar().object("foo"),
         );
         aeq_fix_path_for_value(
-            object!{ "bar" => "b", "foo" => "f"},
+            object! { "bar" => "b", "foo" => "f"},
             Path::scalar().object("nope"),
             Path::object_toggle(),
         );

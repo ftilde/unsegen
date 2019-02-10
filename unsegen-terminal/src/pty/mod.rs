@@ -7,13 +7,13 @@
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
 
+use libc;
 use nix::errno;
+use std::ffi::OsStr;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::result;
-use libc;
-use std::ffi::OsStr;
 
 mod ffi;
 

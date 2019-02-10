@@ -1,15 +1,17 @@
-use unsegen::base::basic_types::*;
-use unsegen::base::{Cursor, CursorState, CursorTarget, ModifyMode, Style, StyleModifier,
-                    StyledGraphemeCluster, Window, WrappingMode, UNBOUNDED_HEIGHT, UNBOUNDED_WIDTH};
-use unsegen::base::Color as UColor;
-use unsegen::widget::{Demand, Demand2D, RenderingHints};
-use unsegen::input::{OperationResult, Scrollable};
 use ansi;
 use ansi::{Attr, CursorStyle, Handler, TermInfo};
+use unsegen::base::basic_types::*;
+use unsegen::base::Color as UColor;
+use unsegen::base::{
+    BoolModifyMode, Cursor, CursorState, CursorTarget, Style, StyleModifier, StyledGraphemeCluster,
+    Window, WrappingMode, UNBOUNDED_HEIGHT, UNBOUNDED_WIDTH,
+};
+use unsegen::input::{OperationResult, Scrollable};
+use unsegen::widget::{Demand, Demand2D, RenderingHints};
 
-use std::fmt::Write;
 use index;
 use std::cmp::{max, min};
+use std::fmt::Write;
 
 #[derive(Clone)]
 struct Line {
@@ -51,7 +53,8 @@ impl Line {
         self.content
             .extend(::std::iter::repeat(StyledGraphemeCluster::default()).take(missing_elements));
 
-        let element = self.content
+        let element = self
+            .content
             .get_mut(x)
             .expect("element existent assured previously");
         Some(element)
@@ -68,7 +71,8 @@ impl Line {
         self.content.extend(::std::iter::repeat(StyledGraphemeCluster::default()).take(missing_elements));
         */
 
-        let element = self.content
+        let element = self
+            .content
             .get(x.raw_value() as usize)
             .expect("element existent assured previously");
         Some(element)
@@ -121,7 +125,8 @@ impl CursorTarget for LineBuffer {
         self.lines
             .extend(::std::iter::repeat(Line::empty()).take(missing_elements));
 
-        let line = self.lines
+        let line = self
+            .lines
             .get_mut(y)
             .expect("line existence assured previously");
 
@@ -139,7 +144,8 @@ impl CursorTarget for LineBuffer {
             return None;
         }
 
-        let line = self.lines
+        let line = self
+            .lines
             .get(y.raw_value() as usize)
             .expect("line existence assured previously");
 
@@ -235,7 +241,7 @@ impl TerminalWindow {
             self.with_cursor(|cursor| {
                 if let Some(cell) = cursor.get_current_cell_mut() {
                     StyleModifier::new()
-                        .invert(ModifyMode::Toggle)
+                        .invert(BoolModifyMode::Toggle)
                         .modify(&mut cell.style);
                 }
             });
@@ -251,7 +257,8 @@ impl TerminalWindow {
         let scrollback_offset =
             -(self.current_scrollback_pos() - self.buffer.height_as_displayed());
         let minimum_y_start = scrollback_offset + height;
-        let start_line = self.buffer
+        let start_line = self
+            .buffer
             .lines
             .len()
             .checked_sub(minimum_y_start.raw_value() as usize)
@@ -278,7 +285,7 @@ impl TerminalWindow {
             self.with_cursor(|cursor| {
                 if let Some(cell) = cursor.get_current_cell_mut() {
                     StyleModifier::new()
-                        .invert(ModifyMode::Toggle)
+                        .invert(BoolModifyMode::Toggle)
                         .modify(&mut cell.style);
                 }
             });
@@ -354,7 +361,7 @@ macro_rules! trace_ansi {
         (write!(&mut ::std::io::stderr(), "INFO: Ansi trace: ")).expect("stderr");
         (writeln!(&mut ::std::io::stderr(), $($arg)*)).expect("stderr");
         */
-    }}
+    }};
 }
 
 impl Handler for TerminalWindow {
@@ -875,8 +882,8 @@ impl TerminalWindow {
 }
 #[cfg(test)]
 mod test {
-    use unsegen::base::terminal::test::FakeTerminal;
     use super::*;
+    use unsegen::base::terminal::test::FakeTerminal;
     use unsegen::base::GraphemeCluster;
 
     fn test_terminal_window<F: Fn(&mut TerminalWindow)>(

@@ -1,8 +1,8 @@
-use unsegen::base::{Color, LineIndex, ModifyMode, StyleModifier, TextFormatModifier};
+use unsegen::base::{BoolModifyMode, Color, LineIndex, StyleModifier, TextFormatModifier};
 
-use syntect::parsing::{ParseState, ScopeStack, SyntaxDefinition};
-use syntect::highlighting;
 use super::PagerLine;
+use syntect::highlighting;
+use syntect::parsing::{ParseState, ScopeStack, SyntaxDefinition};
 
 use syntect::highlighting::Theme;
 
@@ -91,7 +91,7 @@ fn to_unsegen_text_format(style: &highlighting::FontStyle) -> TextFormatModifier
     TextFormatModifier {
         bold: style.contains(highlighting::FontStyle::BOLD).into(),
         italic: style.contains(highlighting::FontStyle::ITALIC).into(),
-        invert: ModifyMode::LeaveUnchanged,
+        invert: BoolModifyMode::LeaveUnchanged,
         underline: style.contains(highlighting::FontStyle::UNDERLINE).into(),
     }
 }

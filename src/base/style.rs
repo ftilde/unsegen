@@ -1,15 +1,26 @@
-use termion;
+//! Types related to the visual representation (i.e., style) of text when drawn to the terminal.
+//! This includes formatting (bold, italic, ...) and colors.
 use std::io::Write;
+use termion;
 
+/// Specifies how text is written to the terminal.
+/// Specified attributes include "bold", "italic", "invert", and "underline" and can be combined
+/// freely.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct TextFormat {
     pub bold: bool,
     pub italic: bool,
     pub invert: bool,
     pub underline: bool,
+
+    // Make users of the library unable to construct RenderingHints from members.
+    // This way we can add members in a backwards compatible way in future versions.
+    #[doc(hidden)]
+    _do_not_construct: (),
 }
 
 impl TextFormat {
+    /// Set the attributes of the given ANSI terminal to match the current TextFormat.
     fn set_terminal_attributes<W: Write>(&self, terminal: &mut W) {
         if self.bold {
             write!(terminal, "{}", termion::style::Bold).expect("set bold style");
@@ -44,80 +55,109 @@ impl Default for TextFormat {
             italic: false,
             invert: false,
             underline: false,
+            _do_not_construct: (),
         }
     }
 }
 
+/// Specifies how to modify a bool value.
+///
+/// (In essence, specifies one of all possible unary boolean functions.)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ModifyMode {
+pub enum BoolModifyMode {
     Yes,
     No,
     Toggle,
     LeaveUnchanged,
 }
 
-impl ModifyMode {
+impl BoolModifyMode {
+    /// Combine the current value with that of the argument so that the application of the returned
+    /// value is always equivalent to first applying other and then applying self to a bool.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::BoolModifyMode;
+    ///
+    /// let mut b = true;
+    ///
+    /// BoolModifyMode::False.on_top_of(BoolModifyMode::True).modify(&mut b);
+    /// assert_eq!(b, false);
+    ///
+    /// BoolModifyMode::Toggle.on_top_of(BoolModifyMode::False).modify(&mut b);
+    /// assert_eq!(b, true);
+    ///
+    /// BoolModifyMode::Toggle.on_top_of(BoolModifyMode::Toggle).modify(&mut b);
+    /// assert_eq!(b, true);
+    ///
+    ///
+    /// assert_eq!(BoolModifyMode::True.on_top_of(BoolModifyMode::Toggle /*or any other value*/),
+    ///             BoolModifyMode::True);
+    /// assert_eq!(BoolModifyMode::Toggle.on_top_of(BoolModifyMode::Toggle),
+    ///             BoolModifyMode::LeaveUnchanged);
+    /// ```
+    ///
     fn on_top_of(&self, other: &Self) -> Self {
         match (*self, *other) {
-            (ModifyMode::Yes, _) => ModifyMode::Yes,
-            (ModifyMode::No, _) => ModifyMode::No,
-            (ModifyMode::Toggle, ModifyMode::Yes) => ModifyMode::No,
-            (ModifyMode::Toggle, ModifyMode::No) => ModifyMode::Yes,
-            (ModifyMode::Toggle, ModifyMode::Toggle) => ModifyMode::No,
-            (ModifyMode::Toggle, ModifyMode::LeaveUnchanged) => ModifyMode::Toggle,
-            (ModifyMode::LeaveUnchanged, m) => m,
+            (BoolModifyMode::Yes, _) => BoolModifyMode::Yes,
+            (BoolModifyMode::No, _) => BoolModifyMode::No,
+            (BoolModifyMode::Toggle, BoolModifyMode::Yes) => BoolModifyMode::No,
+            (BoolModifyMode::Toggle, BoolModifyMode::No) => BoolModifyMode::Yes,
+            (BoolModifyMode::Toggle, BoolModifyMode::Toggle) => BoolModifyMode::No,
+            (BoolModifyMode::Toggle, BoolModifyMode::LeaveUnchanged) => BoolModifyMode::Toggle,
+            (BoolModifyMode::LeaveUnchanged, m) => m,
         }
     }
     fn modify(&self, should_invert: &mut bool) {
         match *self {
-            ModifyMode::Yes => *should_invert = true,
-            ModifyMode::No => *should_invert = false,
-            ModifyMode::Toggle => *should_invert ^= true,
-            ModifyMode::LeaveUnchanged => {}
+            BoolModifyMode::Yes => *should_invert = true,
+            BoolModifyMode::No => *should_invert = false,
+            BoolModifyMode::Toggle => *should_invert ^= true,
+            BoolModifyMode::LeaveUnchanged => {}
         }
     }
 }
 
-impl ::std::convert::From<bool> for ModifyMode {
+impl ::std::convert::From<bool> for BoolModifyMode {
     fn from(on: bool) -> Self {
         if on {
-            ModifyMode::Yes
+            BoolModifyMode::Yes
         } else {
-            ModifyMode::No
+            BoolModifyMode::No
         }
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct TextFormatModifier {
-    pub bold: ModifyMode,
-    pub italic: ModifyMode,
-    pub invert: ModifyMode,
-    pub underline: ModifyMode,
+    pub bold: BoolModifyMode,
+    pub italic: BoolModifyMode,
+    pub invert: BoolModifyMode,
+    pub underline: BoolModifyMode,
 }
 
 impl TextFormatModifier {
     pub fn new() -> Self {
         TextFormatModifier {
-            bold: ModifyMode::LeaveUnchanged,
-            italic: ModifyMode::LeaveUnchanged,
-            invert: ModifyMode::LeaveUnchanged,
-            underline: ModifyMode::LeaveUnchanged,
+            bold: BoolModifyMode::LeaveUnchanged,
+            italic: BoolModifyMode::LeaveUnchanged,
+            invert: BoolModifyMode::LeaveUnchanged,
+            underline: BoolModifyMode::LeaveUnchanged,
         }
     }
-    pub fn bold<M: Into<ModifyMode>>(mut self, val: M) -> Self {
+    pub fn bold<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.bold = val.into();
         self
     }
-    pub fn italic<M: Into<ModifyMode>>(mut self, val: M) -> Self {
+    pub fn italic<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.italic = val.into();
         self
     }
-    pub fn invert<M: Into<ModifyMode>>(mut self, val: M) -> Self {
+    pub fn invert<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.invert = val.into();
         self
     }
-    pub fn underline<M: Into<ModifyMode>>(mut self, val: M) -> Self {
+    pub fn underline<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.underline = val.into();
         self
     }
@@ -299,19 +339,19 @@ impl StyleModifier {
     }
 
     // Convenience functions to access text format
-    pub fn bold<M: Into<ModifyMode>>(mut self, val: M) -> Self {
+    pub fn bold<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.format.bold = val.into();
         self
     }
-    pub fn italic<M: Into<ModifyMode>>(mut self, val: M) -> Self {
+    pub fn italic<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.format.italic = val.into();
         self
     }
-    pub fn invert<M: Into<ModifyMode>>(mut self, val: M) -> Self {
+    pub fn invert<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.format.invert = val.into();
         self
     }
-    pub fn underline<M: Into<ModifyMode>>(mut self, val: M) -> Self {
+    pub fn underline<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.format.underline = val.into();
         self
     }

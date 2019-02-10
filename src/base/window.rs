@@ -1,10 +1,10 @@
 //! Types associated with Windows, i.e., rectangular views into a terminal buffer.
 use super::{CursorTarget, GraphemeCluster, Style, StyleModifier};
-use ndarray::{Array, ArrayViewMut, Axis, Ix, Ix2};
-use std::cmp::max;
-use base::ranges::{Bound, RangeArgument};
 use base::basic_types::*;
 use base::cursor::{UNBOUNDED_HEIGHT, UNBOUNDED_WIDTH};
+use base::ranges::{Bound, RangeArgument};
+use ndarray::{Array, ArrayViewMut, Axis, Ix, Ix2};
+use std::cmp::max;
 use std::fmt;
 
 /// A GraphemeCluster with an associated style.
@@ -220,7 +220,8 @@ impl<'w> Window<'w> {
         if (self.get_extent() + PositiveAxisDiff::<D>::new(1).unwrap())
             .origin_range_contains(split_pos)
         {
-            let (first_mat, second_mat) = self.values
+            let (first_mat, second_mat) = self
+                .values
                 .split_at(Axis(D::NDARRAY_AXIS_NUMBER), split_pos.raw_value() as Ix);
             let w_u = Window {
                 values: first_mat,

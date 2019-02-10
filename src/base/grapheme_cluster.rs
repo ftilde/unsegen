@@ -1,8 +1,8 @@
 //! Types related to grapheme cluster in utf8 encoding.
 
-use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 use smallvec::SmallVec;
 use std::str::FromStr;
+use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 
 /// A single grapheme cluster encoded in utf8. It may consist of multiple bytes or even multiple chars. For details
 /// on what a grapheme cluster is, read [this](http://utf8everywhere.org/) or similar.

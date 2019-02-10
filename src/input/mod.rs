@@ -1,6 +1,6 @@
+use std::collections::HashSet;
 pub use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{EventsAndRaw, TermReadEventsAndRaw};
-use std::collections::HashSet;
 
 use std::io;
 

@@ -4,7 +4,7 @@ unsegen
 unsegen is a library facilitating the creation of text user interface (TUI) applications akin to ncurses and the like.
 Currently, unsegen only provides a Rust interface.
 
-The following libraries are built on top of unsegen:
+The following libraries are built on top of unsegen and provide higher level functionality:
 
 * unsegen-terminal provides a pseudoterminal that can be easily integrated into applications using unsegen.
 * unsegen-jsonviewer provides an interactive widget that can be used to display json values.

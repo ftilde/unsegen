@@ -7,9 +7,9 @@ extern crate json;
 #[cfg(not(test))]
 extern crate json;
 
-use unsegen::widget::{Demand, Demand2D, RenderingHints, Widget};
 use unsegen::base::basic_types::*;
-use unsegen::base::{Color, Cursor, ExtentEstimationWindow, ModifyMode, StyleModifier, Window};
+use unsegen::base::{BoolModifyMode, Color, Cursor, ExtentEstimationWindow, StyleModifier, Window};
+use unsegen::widget::{Demand, Demand2D, RenderingHints, Widget};
 
 use unsegen::input::{OperationResult, Scrollable};
 
@@ -20,11 +20,11 @@ pub mod json_ext {
 
 use json::JsonValue;
 
-mod path;
 mod displayvalue;
+mod path;
 
-use self::path::*;
 use self::displayvalue::*;
+use self::path::*;
 
 pub struct JsonViewer {
     value: DisplayValue,
@@ -41,7 +41,9 @@ impl JsonViewer {
             value: DisplayValue::from_json(&value),
             active_element: Path::Scalar, //Will be fixed ...
             indentation: Width::new(2).unwrap(),
-            active_focused_style: StyleModifier::new().invert(ModifyMode::Toggle).bold(true),
+            active_focused_style: StyleModifier::new()
+                .invert(BoolModifyMode::Toggle)
+                .bold(true),
             inactive_focused_style: StyleModifier::new().bold(true),
             item_changed_style: StyleModifier::new().bg_color(Color::Red),
         };

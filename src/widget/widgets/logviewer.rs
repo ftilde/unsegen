@@ -1,9 +1,9 @@
-use widget::{Demand, Demand2D, RenderingHints, Widget};
-use std::ops::Range;
 use base::basic_types::*;
 use base::{Cursor, Window, WrappingMode};
 use input::{OperationResult, Scrollable};
 use std::fmt;
+use std::ops::Range;
+use widget::{Demand, Demand2D, RenderingHints, Widget};
 
 pub struct LogViewer {
     storage: Vec<String>, // Invariant: always holds at least one line
@@ -33,7 +33,8 @@ impl LogViewer {
     }
 
     pub fn active_line_mut(&mut self) -> &mut String {
-        return self.storage
+        return self
+            .storage
             .last_mut()
             .expect("Invariant: At least one line");
     }

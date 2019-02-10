@@ -1,8 +1,10 @@
-use base::{StyleModifier, Window};
 use base::basic_types::*;
+use base::{StyleModifier, Window};
 use input::{Behavior, Input, Navigatable, OperationResult};
-use widget::{layout_linearly, ColDemand, Demand, Demand2D, RenderingHints, RowDemand,
-             SeparatingStyle, Widget};
+use widget::{
+    layout_linearly, ColDemand, Demand, Demand2D, RenderingHints, RowDemand, SeparatingStyle,
+    Widget,
+};
 
 pub struct Column<T: ?Sized> {
     pub access: fn(&T) -> &Widget,

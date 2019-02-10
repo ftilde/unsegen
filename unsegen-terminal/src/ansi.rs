@@ -665,7 +665,7 @@ where
                     buf.push_str("],");
                 }
                 warn!("[unhandled osc_dispatch]: [{}] at line {}", &buf, line!());
-            }}
+            }};
         }
 
         if params.is_empty() || params[0].is_empty() {
@@ -726,7 +726,7 @@ where
                     macro_rules! next {
                         () => {
                             iter.next().map(|v| *v as char)
-                        }
+                        };
                     }
                     if next!() != Some('r') {
                         return unhandled!();
@@ -755,7 +755,7 @@ where
                                 digit += value as u8;
                             }
                             digit
-                        }}
+                        }};
                     }
 
                     let r = parse_hex!();
@@ -789,22 +789,20 @@ where
 
         macro_rules! unhandled {
             () => {{
-                warn!("[Unhandled CSI] action={:?}, args={:?}, intermediates={:?}",
-                             action, args, intermediates);
+                warn!(
+                    "[Unhandled CSI] action={:?}, args={:?}, intermediates={:?}",
+                    action, args, intermediates
+                );
                 return;
-            }}
+            }};
         }
 
         macro_rules! arg_or_default {
             (idx: $idx:expr, default: $default:expr) => {
-                args.get($idx).and_then(|v| {
-                    if *v == 0 {
-                        None
-                    } else {
-                        Some(*v)
-                    }
-                }).unwrap_or($default)
-            }
+                args.get($idx)
+                    .and_then(|v| if *v == 0 { None } else { Some(*v) })
+                    .unwrap_or($default)
+            };
         }
 
         match action {
@@ -1006,10 +1004,12 @@ where
     fn esc_dispatch(&mut self, params: &[i64], intermediates: &[u8], _ignore: bool, byte: u8) {
         macro_rules! unhandled {
             () => {{
-                warn!("[unhandled] esc_dispatch params={:?}, ints={:?}, byte={:?} ({:02x})",
-                             params, intermediates, byte as char, byte);
+                warn!(
+                    "[unhandled] esc_dispatch params={:?}, ints={:?}, byte={:?} ({:02x})",
+                    params, intermediates, byte as char, byte
+                );
                 return;
-            }}
+            }};
         }
 
         macro_rules! configure_charset {
@@ -1022,7 +1022,7 @@ where
                     _ => unhandled!(),
                 };
                 self.handler.configure_charset(index, $charset)
-            }}
+            }};
         }
 
         match byte {
@@ -1257,9 +1257,9 @@ pub mod C1 {
 // Byte sequences used in these tests are recording of pty stdout.
 #[cfg(test)]
 mod tests {
-    use std::io;
-    use index::{Column, Line};
     use super::{Attr, CharsetIndex, Color, Handler, Processor, Rgb, StandardCharset, TermInfo};
+    use index::{Column, Line};
+    use std::io;
 
     /// The /dev/null of io::Write
     struct Void;

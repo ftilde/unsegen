@@ -1,11 +1,11 @@
-pub mod linelabel;
 pub mod lineedit;
-pub mod promptline;
+pub mod linelabel;
 pub mod logviewer;
+pub mod promptline;
 pub mod table;
 
-pub use self::linelabel::*;
 pub use self::lineedit::*;
-pub use self::promptline::*;
+pub use self::linelabel::*;
 pub use self::logviewer::*;
+pub use self::promptline::*;
 pub use self::table::*;

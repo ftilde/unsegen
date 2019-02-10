@@ -144,7 +144,7 @@ macro_rules! forward_ref_binop {
                 $imp::$method(*self, *other)
             }
         }
-    }
+    };
 }
 
 /// Macro for deriving deref
@@ -158,7 +158,7 @@ macro_rules! deref {
                 &self.0
             }
         }
-    }
+    };
 }
 
 macro_rules! add {
@@ -171,7 +171,7 @@ macro_rules! add {
                 $construct(self.0 + rhs.0)
             }
         }
-    }
+    };
 }
 
 macro_rules! sub {
@@ -211,7 +211,7 @@ macro_rules! sub {
                 $construct(self.0 - rhs.0)
             }
         }
-    }
+    };
 }
 
 /// This exists because we can't implement Iterator on Range
@@ -257,8 +257,10 @@ macro_rules! inclusive {
                 match *self {
                     Empty { .. } => return None, // empty iterators yield no values
 
-                    NonEmpty { ref mut start, ref mut end } => {
-
+                    NonEmpty {
+                        ref mut start,
+                        ref mut end,
+                    } => {
                         // march start towards (maybe past!) end and yield the old value
                         if start <= end {
                             let old = *start;
@@ -285,13 +287,13 @@ macro_rules! inclusive {
                         let added = $steps_add_one(start, end);
                         match added {
                             Some(hint) => (hint.saturating_add(1), hint.checked_add(1)),
-                            None       => (0, None)
+                            None => (0, None),
                         }
                     }
                 }
             }
         }
-    }
+    };
 }
 
 fn steps_add_one_u8(start: &u8, end: &u8) -> Option<usize> {

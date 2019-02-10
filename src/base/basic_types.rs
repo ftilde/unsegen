@@ -1,9 +1,9 @@
 //! Basic numeric semantic wrapper types for use in other parts of the library.
 use std::cmp::Ordering;
-use std::ops::{Add, AddAssign, Div, Mul, Neg, Range, Rem, Sub, SubAssign};
-use std::marker::PhantomData;
-use std::iter::Sum;
 use std::fmt;
+use std::iter::Sum;
+use std::marker::PhantomData;
+use std::ops::{Add, AddAssign, Div, Mul, Neg, Range, Rem, Sub, SubAssign};
 
 /// AxisIndex (the base for ColIndex or RowIndex) is a signed integer coordinate (i.e., a
 /// coordinate of a point on the terminal cell grid)

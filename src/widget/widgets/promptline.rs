@@ -1,6 +1,6 @@
 use super::super::{Demand2D, HorizontalLayout, RenderingHints, SeparatingStyle, Widget};
-use base::Window;
 use super::{LineEdit, LineLabel};
+use base::Window;
 use input::{Editable, Navigatable, OperationResult, Scrollable, Writable};
 
 pub struct PromptLine {

@@ -1,5 +1,7 @@
-use super::{ColDiff, ColIndex, GraphemeCluster, Height, IndexRange, RowDiff, RowIndex, Style,
-            StyleModifier, StyledGraphemeCluster, Width, Window};
+use super::{
+    ColDiff, ColIndex, GraphemeCluster, Height, IndexRange, RowDiff, RowIndex, Style,
+    StyleModifier, StyledGraphemeCluster, Width, Window,
+};
 use std::cmp::max;
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
@@ -317,12 +319,14 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             let mut current_width = old_target_cluster_width;
             while current_width == 0 {
                 current_x -= 1;
-                current_width = Width::new(self.window
-                    .get_cell_mut(current_x, y)
-                    .expect("finding wide cluster start: read in bounds")
-                    .grapheme_cluster
-                    .width() as i32)
-                    .expect("width is non-negative");
+                current_width = Width::new(
+                    self.window
+                        .get_cell_mut(current_x, y)
+                        .expect("finding wide cluster start: read in bounds")
+                        .grapheme_cluster
+                        .width() as i32,
+                )
+                .expect("width is non-negative");
             }
 
             // Clear all cells (except the newly written one)
@@ -427,12 +431,14 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             clusters
                 .iter()
                 .map(|s| s.grapheme_cluster.width())
-                .sum::<usize>() == clusters.len(),
+                .sum::<usize>()
+                == clusters.len(),
             "Invalid preformated cluster slice!"
         );
 
         for cluster in clusters.iter() {
-            if self.write_cluster(cluster.grapheme_cluster.clone(), &cluster.style)
+            if self
+                .write_cluster(cluster.grapheme_cluster.clone(), &cluster.style)
                 .is_err()
             {
                 break;
@@ -564,8 +570,8 @@ impl<'a, 'c: 'a, 'g: 'c, T: 'c + CursorTarget> ::std::ops::Deref for CursorResto
 
 #[cfg(test)]
 mod test {
-    use base::test::FakeTerminal;
     use super::*;
+    use base::test::FakeTerminal;
 
     fn test_cursor<S: Fn(&mut Cursor), F: Fn(&mut Cursor)>(
         window_dim: (u32, u32),

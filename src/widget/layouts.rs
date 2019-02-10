@@ -301,8 +301,8 @@ mod test {
     extern crate rand;
     use self::rand::Rng;
 
-    use base::test::FakeTerminal;
     use super::*;
+    use base::test::FakeTerminal;
 
     struct FakeWidget {
         space_demand: Demand2D,
@@ -332,7 +332,8 @@ mod test {
     }
 
     fn assert_eq_boxed_slices(b1: Box<[Width]>, b2: Box<[i32]>, description: &str) {
-        let b2 = b2.iter()
+        let b2 = b2
+            .iter()
             .map(|&i| Width::new(i).unwrap())
             .collect::<Vec<_>>()
             .into_boxed_slice();

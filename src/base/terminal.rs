@@ -24,12 +24,12 @@
 //!
 //! }
 //! ```
-use ndarray::Axis;
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion;
 use base::{Height, Style, Width, Window, WindowBuffer};
+use ndarray::Axis;
 use std::io;
 use std::io::{StdoutLock, Write};
+use termion;
+use termion::raw::{IntoRawMode, RawTerminal};
 
 use nix::sys::signal::{kill, pthread_sigmask, SigSet, SigmaskHow, SIGCONT, SIGTSTP};
 use nix::unistd::getpgrp;
@@ -136,7 +136,8 @@ impl<'a> Terminal<'a> {
                 self.terminal,
                 "{}",
                 termion::cursor::Goto(1, (y + 1) as u16)
-            ).expect("move cursor");
+            )
+            .expect("move cursor");
             let mut buffer = String::with_capacity(line.len());
             for c in line.iter() {
                 if c.style != current_style {
@@ -167,8 +168,9 @@ impl<'a> Drop for Terminal<'a> {
 }
 
 pub mod test {
-    use super::super::{GraphemeCluster, Height, Style, StyledGraphemeCluster, Width, Window,
-                       WindowBuffer};
+    use super::super::{
+        GraphemeCluster, Height, Style, StyledGraphemeCluster, Width, Window, WindowBuffer,
+    };
 
     /// A fake terminal that can be used in tests to create windows and compare the resulting
     /// contents to the expected contents of windows.
@@ -205,7 +207,7 @@ pub mod test {
             }
             Ok(FakeTerminal {
                 values: WindowBuffer::from_storage(
-                    try!{::ndarray::Array2::from_shape_vec((h as usize, w as usize), tiles)},
+                    try! {::ndarray::Array2::from_shape_vec((h as usize, w as usize), tiles)},
                 ),
             })
         }
@@ -243,10 +245,10 @@ pub mod test {
             for r in 0..raw_values.dim().0 {
                 for c in 0..raw_values.dim().1 {
                     let c = raw_values.get((r, c)).expect("debug: in bounds");
-                    try!{write!(f, "{}", c.grapheme_cluster.as_str())};
+                    try! {write!(f, "{}", c.grapheme_cluster.as_str())};
                 }
                 if r != raw_values.dim().0 - 1 {
-                    try!{write!(f, "|")};
+                    try! {write!(f, "|")};
                 }
             }
             Ok(())

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use unsegen::base::basic_types::*;
-use unsegen::widget::RenderingHints;
 use unsegen::base::{Cursor, CursorTarget, StyleModifier};
+use unsegen::widget::RenderingHints;
 
 use json::JsonValue;
 

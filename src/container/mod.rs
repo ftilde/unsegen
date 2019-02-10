@@ -1,17 +1,17 @@
 pub mod boxdrawing;
 
-use base::{CursorTarget, StyleModifier, Window};
+use self::boxdrawing::{LineCell, LineSegment, LineType};
 use base::basic_types::*;
-use widget::{ColDemand, Demand2D, RenderingHints, RowDemand, Widget};
-use widget::layouts::layout_linearly;
+use base::{CursorTarget, StyleModifier, Window};
 use input::{Behavior, Input, Navigatable, OperationResult};
 use std::cell::Cell;
-use std::collections::BTreeMap;
+use std::cmp::{max, min};
 use std::collections::btree_map;
+use std::collections::BTreeMap;
 use std::convert::From;
 use std::ops::Range;
-use std::cmp::{max, min};
-use self::boxdrawing::{LineCell, LineSegment, LineType};
+use widget::layouts::layout_linearly;
+use widget::{ColDemand, Demand2D, RenderingHints, RowDemand, Widget};
 
 pub trait Container<P: ?Sized>: Widget {
     fn input(&mut self, input: Input, parameters: &mut P) -> Option<Input>;
@@ -45,7 +45,8 @@ impl<'a, 'b, 'c, 'd: 'a, C: ContainerProvider + 'a + 'b> Behavior
             self.provider
                 .get_mut(&self.app.active)
                 .input(i, self.parameters)
-        }).finish()
+        })
+        .finish()
     }
 }
 
@@ -121,8 +122,10 @@ impl Rectangle {
         let east = x_r == x;
         let north = y_l == y;
         let south = y_r == y;
-        if east && dir == LineSegment::East || west && dir == LineSegment::West
-            || north && dir == LineSegment::North || south && dir == LineSegment::South
+        if east && dir == LineSegment::East
+            || west && dir == LineSegment::West
+            || north && dir == LineSegment::North
+            || south && dir == LineSegment::South
         {
             false
         } else {
@@ -246,7 +249,8 @@ impl<'a, C: ContainerProvider> Layout<C> for HSplit<'a, C> {
     }
     fn layout(&self, available_area: Rectangle, containers: &C) -> LayoutOutput<C::Index> {
         let separator_length = Width::new(1).unwrap();
-        let horizontal_demands: Vec<ColDemand> = self.elms
+        let horizontal_demands: Vec<ColDemand> = self
+            .elms
             .iter()
             .map(|w| w.space_demand(containers).width)
             .collect();
@@ -300,7 +304,8 @@ impl<'a, C: ContainerProvider> Layout<C> for VSplit<'a, C> {
     }
     fn layout(&self, available_area: Rectangle, containers: &C) -> LayoutOutput<C::Index> {
         let separator_length = Height::new(1).unwrap();
-        let vertical_demands: Vec<RowDemand> = self.elms
+        let vertical_demands: Vec<RowDemand> = self
+            .elms
             .iter()
             .map(|w| w.space_demand(containers).height)
             .collect();

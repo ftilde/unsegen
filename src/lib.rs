@@ -7,6 +7,6 @@ extern crate unicode_segmentation;
 extern crate unicode_width;
 
 pub mod base;
+pub mod container;
 pub mod input;
 pub mod widget;
-pub mod container;

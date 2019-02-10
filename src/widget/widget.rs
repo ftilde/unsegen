@@ -1,9 +1,9 @@
-use base::Window;
 use base::basic_types::*;
+use base::Window;
 use std::cmp::max;
+use std::iter::Sum;
 use std::marker::PhantomData;
 use std::ops::{Add, AddAssign};
-use std::iter::Sum;
 
 pub trait Widget {
     fn space_demand(&self) -> Demand2D;
