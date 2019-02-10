@@ -2,27 +2,27 @@ extern crate libc;
 extern crate nix;
 extern crate unsegen;
 extern crate vte;
-mod pty;
 #[allow(dead_code)]
 mod ansi;
 #[allow(dead_code)]
 mod index;
+mod pty;
 mod terminalwindow;
 
-use unsegen::base::basic_types::*;
-use unsegen::base::Window;
-use unsegen::input::{Behavior, Input, Key, OperationResult, ScrollBehavior, Scrollable, Writable};
-use unsegen::widget::{Demand2D, RenderingHints, Widget};
+use ansi::Processor;
 use pty::{PTYInput, PTYOutput, PTY};
 use std::ffi::{OsStr, OsString};
-use ansi::Processor;
+use unsegen::base::basic_types::*;
+use unsegen::base::Window;
 use unsegen::container::Container;
+use unsegen::input::{Behavior, Input, Key, OperationResult, ScrollBehavior, Scrollable, Writable};
+use unsegen::widget::{Demand2D, RenderingHints, Widget};
 
 use terminalwindow::TerminalWindow;
 
+use std::cell::RefCell;
 use std::fs::File;
 use std::thread;
-use std::cell::RefCell;
 
 fn read_slave_input_loop<S: SlaveInputSink>(sink: S, mut reader: PTYOutput) {
     use std::io::Read;
@@ -137,7 +137,7 @@ impl Terminal {
             window.set_height(h);
 
             let w16 = w.raw_value() as u16;
-            let h16 = w.raw_value() as u16;
+            let h16 = h.raw_value() as u16;
             self.master_input_sink
                 .borrow_mut()
                 .resize(w16, h16, w16 /* TODO ??*/, h16 /* TODO ??*/)
