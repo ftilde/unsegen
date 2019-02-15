@@ -1,3 +1,4 @@
+//! A Cursor can be used to render text to Windows and Window-like types.
 use super::{
     ColDiff, ColIndex, GraphemeCluster, Height, IndexRange, RowDiff, RowIndex, Style,
     StyleModifier, StyledGraphemeCluster, Width, Window,
@@ -6,24 +7,45 @@ use std::cmp::max;
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 
+/// Defines how a cursor behaves when arriving at the right-hand border of the CursorTarget.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum WrappingMode {
     Wrap,
     NoWrap,
 }
 
+/// Something that can be written to using a Cursor. A most prominent example would be a Window.
 pub trait CursorTarget {
+    /// Return the actual width of the window. Writing to a column outside of this range is not
+    /// possible.
     fn get_width(&self) -> Width;
+    /// Return the soft or "desired" width of the target. In most cases this is equal to the width.
+    /// An example where this is not the case would be a terminal with builtin wrapping of lines
+    /// where it is some cases desirable for the cursor to wrap at the width of the terminal, even
+    /// though there is no (conceptual) limit of line length.
     fn get_soft_width(&self) -> Width {
         self.get_width()
     }
+    /// Return the maximum height of the target. Writing to a row outside of this range is not
+    /// possible.
     fn get_height(&self) -> Height;
+
+    /// Get the (mutable) cell at the specified position. The implementor must ensure that in the
+    /// range for x \in [0, Width) and y \in [0, Height) a valid cluster is returned.
     fn get_cell_mut(&mut self, x: ColIndex, y: RowIndex) -> Option<&mut StyledGraphemeCluster>;
+
+    /// Get the cell at the specified position. The implementor must ensure that in the range for
+    /// x \in [0, Width) and y \in [0, Height) a valid cluster is returned.
     fn get_cell(&self, x: ColIndex, y: RowIndex) -> Option<&StyledGraphemeCluster>;
-    fn get_default_style(&self) -> &Style;
+
+    /// Return the default style that characters of this target should be printed as. This serves
+    /// as the base for further style modifications while writing to the target.
+    fn get_default_style(&self) -> Style;
 }
 
 //FIXME: compile time evaluation, see https://github.com/rust-lang/rust/issues/24111
+//Update(02/2019): const fn are partially stable, but are not allowed for types with trait bounds other that
+//`Sized`.
 //pub const UNBOUNDED_WIDTH: Width = Width::new(2147483647).unwrap();//i32::max_value() as u32;
 //pub const UNBOUNDED_HEIGHT: Height = Height::new(2147483647).unwrap();//i32::max_value() as u32;
 /// A symbolic value that can be used to specify that a cursor target does not have a maximum
@@ -33,6 +55,8 @@ pub const UNBOUNDED_WIDTH: i32 = 2147483647; //i32::max_value() as u32;
 /// height.
 pub const UNBOUNDED_HEIGHT: i32 = 2147483647; //i32::max_value() as u32;
 
+/// The actual state of a Cursor in contrast to a Cursor instance itself, which also stored a
+/// reference to the target it writes to.
 pub struct CursorState {
     wrapping_mode: WrappingMode,
     style_modifier: StyleModifier,
@@ -46,7 +70,7 @@ impl Default for CursorState {
     fn default() -> Self {
         CursorState {
             wrapping_mode: WrappingMode::NoWrap,
-            style_modifier: StyleModifier::none(),
+            style_modifier: StyleModifier::new(),
             x: ColIndex::new(0),
             y: RowIndex::new(0),
             line_start_column: ColIndex::new(0),
@@ -55,6 +79,7 @@ impl Default for CursorState {
     }
 }
 
+/// Something that can be used to easily write text to a CursorTarget (e.g., a Window).
 pub struct Cursor<'c, 'g: 'c, T: 'c + CursorTarget = Window<'g>> {
     window: &'c mut T,
     _dummy: ::std::marker::PhantomData<&'g ()>,
@@ -62,37 +87,29 @@ pub struct Cursor<'c, 'g: 'c, T: 'c + CursorTarget = Window<'g>> {
 }
 
 impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
-    pub fn new(window: &'c mut T) -> Self {
-        Self::with_state(window, CursorState::default())
+    /// Create a cursor to act on the specified window. The cursor initially resides at location
+    /// (0,0) and only uses the style of the target.
+    pub fn new(target: &'c mut T) -> Self {
+        Self::from_state(target, CursorState::default())
     }
 
-    pub fn with_state(window: &'c mut T, state: CursorState) -> Self {
+    /// Construct a cursor from the given state to act on the specified target.
+    pub fn from_state(target: &'c mut T, state: CursorState) -> Self {
         Cursor {
-            window: window,
+            window: target,
             _dummy: ::std::marker::PhantomData::default(),
             state: state,
         }
     }
 
+    /// Destroy the cursor and retrieve the current state. This is useful for storing the state
+    /// between `draw`-like calls.
     pub fn into_state(self) -> CursorState {
         self.state
     }
 
-    pub fn set_position(&mut self, x: ColIndex, y: RowIndex) {
-        self.state.x = x;
-        self.state.y = y;
-    }
-
-    pub fn set_position_x(&mut self, x: ColIndex) {
-        self.state.x = x;
-    }
-
-    pub fn set_position_y(&mut self, y: RowIndex) {
-        self.state.y = y;
-    }
-
     pub fn position(mut self, x: ColIndex, y: RowIndex) -> Self {
-        self.set_position(x, y);
+        self.move_to(x, y);
         self
     }
 
@@ -100,17 +117,36 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         (self.state.x, self.state.y)
     }
 
-    pub fn get_pos_x(&self) -> ColIndex {
+    pub fn get_col(&self) -> ColIndex {
         self.state.x
     }
 
-    pub fn get_pos_y(&self) -> RowIndex {
+    pub fn get_row(&self) -> RowIndex {
         self.state.y
     }
 
+    /// Move the cursor by the specifed amount in x- and y-direction.
+    /// # Examples:
+    ///
+    /// ```
+    /// use unsegen::base::*;
+    ///
+    /// let mut w = ExtentEstimationWindow::with_width(Width::new(20).unwrap());
+    /// let mut cursor = Cursor::new(&mut w).position(ColIndex::new(27), RowIndex::new(37));
+    ///
+    /// cursor.move_by(ColDiff::new(10), RowDiff::new(-10));
+    ///
+    /// assert_eq!(cursor.get_col(), ColIndex::new(37));
+    /// assert_eq!(cursor.get_row(), RowIndex::new(27));
+    /// ```
     pub fn move_by(&mut self, x: ColDiff, y: RowDiff) {
         self.state.x += x;
         self.state.y += y;
+    }
+
+    pub fn move_to(&mut self, x: ColIndex, y: RowIndex) {
+        self.state.x = x;
+        self.state.y = y;
     }
 
     pub fn move_to_x(&mut self, x: ColIndex) {
@@ -124,7 +160,9 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
     /// Move left, but skip empty clusters, also wrap to the line above if wrapping is active
     pub fn move_left(&mut self) {
         loop {
-            if self.state.wrapping_mode == WrappingMode::Wrap && self.state.x <= 0 {
+            if self.state.wrapping_mode == WrappingMode::Wrap
+                && self.state.x <= self.state.line_start_column
+            {
                 self.move_by(0.into(), RowDiff::new(-1));
                 let right_most_column: ColIndex = (self.window.get_soft_width() - 1).from_origin();
                 self.move_to_x(right_most_column);
@@ -178,31 +216,65 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self
     }
 
-    pub fn set_line_start_column(&mut self, column: ColIndex) {
-        self.state.line_start_column = column;
-    }
-
-    pub fn move_line_start_column(&mut self, d: ColDiff) {
-        self.state.line_start_column += d;
-    }
-
+    /// Set the column to which to cursor will jump automatically when wrapping at the end.
+    /// Furthermore, when moving left, the cursor will wrap upwards if crossing over the start
+    /// column.
+    ///
+    /// The default value is, of course, 0.
+    ///
+    /// # Examples:
+    ///
+    /// ```
+    /// use unsegen::base::*;
+    ///
+    /// let mut w = ExtentEstimationWindow::with_width(Width::new(20).unwrap());
+    /// let mut cursor = Cursor::new(&mut w)
+    ///     .wrapping_mode(WrappingMode::Wrap)
+    ///     .line_start_column(ColIndex::new(5))
+    ///     .position(ColIndex::new(5), RowIndex::new(1));
+    ///
+    /// cursor.move_left();
+    /// assert_eq!(cursor.get_col(), ColIndex::new(19));
+    ///
+    /// cursor.move_right();
+    /// assert_eq!(cursor.get_col(), ColIndex::new(5));
+    /// ```
     pub fn line_start_column(mut self, column: ColIndex) -> Self {
         self.set_line_start_column(column);
         self
     }
 
+    pub fn set_line_start_column(&mut self, column: ColIndex) {
+        self.state.line_start_column = column;
+    }
+
+    /// Move the start column by the specified amount.
+    pub fn move_line_start_column(&mut self, d: ColDiff) {
+        self.state.line_start_column += d;
+    }
+
+    /// Set the style modifier that will be used when writing cells to the target.
+    /// The modifier will be applied to the base style of the target before writing to a cell.
     pub fn set_style_modifier(&mut self, style_modifier: StyleModifier) {
         self.state.style_modifier = style_modifier;
     }
 
+    pub fn get_style_modifier(&mut self) -> StyleModifier {
+        self.state.style_modifier
+    }
+
+    /// Apply the specified modifier *on_top* of the current modifier.
     pub fn apply_style_modifier(&mut self, style_modifier: StyleModifier) {
         self.state.style_modifier = style_modifier.on_top_of(&self.state.style_modifier);
     }
 
+    /// Set how far a tab character ('\t') will move the cursor to the right.
     pub fn set_tab_column_width(&mut self, width: Width) {
         self.state.tab_column_width = width;
     }
 
+    /// Emulate a "backspace" action, i.e., move the cursor one character to the left and replace
+    /// the character under the cursor with a space.
     pub fn backspace(&mut self) {
         self.move_left();
 
@@ -217,6 +289,8 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self.move_left();
     }
 
+    /// Clear all characters within the current line according to the specified range, i.e.,
+    /// replace them with spaces.
     fn clear_line_in_range(&mut self, range: Range<ColIndex>) {
         let style = self.active_style();
         let saved_x = self.state.x;
@@ -228,22 +302,28 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self.state.x = saved_x;
     }
 
+    /// Clear all character to the left of the cursor in the current line including the cursor
+    /// position itself.
     pub fn clear_line_left(&mut self) {
         let end = self.state.x + 1;
         self.clear_line_in_range(0.into()..end);
     }
 
+    /// Clear all character to the right of the cursor in the current line including the cursor
+    /// position itself.
     pub fn clear_line_right(&mut self) {
         let start = self.state.x;
         let end = self.window.get_soft_width().from_origin();
         self.clear_line_in_range(start..end);
     }
 
+    /// Clear all characters in the current line.
     pub fn clear_line(&mut self) {
         let end = self.window.get_soft_width().from_origin();
         self.clear_line_in_range(0.into()..end);
     }
 
+    /// Fill the remainder of the line with spaces and wrap to the beginning of the next line.
     pub fn fill_and_wrap_line(&mut self) {
         if self.window.get_height() == 0 {
             return;
@@ -255,11 +335,13 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self.wrap_line();
     }
 
+    /// Wrap to the beginning of the current line.
     pub fn wrap_line(&mut self) {
         self.state.y += 1;
         self.carriage_return();
     }
 
+    /// Move the cursor to the beginning of the current line (but do not change the row position).
     pub fn carriage_return(&mut self) {
         self.state.x = self.state.line_start_column;
     }
@@ -270,6 +352,8 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             .apply(self.window.get_default_style())
     }
 
+    /// Calculate the number of wraps that are expected when writing the given text to the
+    /// terminal, but do not write the text itself.
     pub fn num_expected_wraps(&self, line: &str) -> usize {
         if self.state.wrapping_mode == WrappingMode::Wrap {
             let num_chars = line.graphemes(true).count();
@@ -281,6 +365,7 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         }
     }
 
+    /// Create a cluster representing a tab character for the curren tab width.
     fn create_tab_cluster(width: Width) -> GraphemeCluster {
         use std::iter::FromIterator;
         let tab_string =
@@ -288,6 +373,7 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         GraphemeCluster::from_str_unchecked(tab_string)
     }
 
+    /// (Mutably) get the cell under the current cursor position.
     pub fn get_current_cell_mut(&mut self) -> Option<&mut StyledGraphemeCluster> {
         if self.state.x < 0 || self.state.y < 0 {
             None
@@ -295,6 +381,8 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             self.window.get_cell_mut(self.state.x, self.state.y)
         }
     }
+
+    /// Get the cell under the current cursor position.
     pub fn get_current_cell(&self) -> Option<&StyledGraphemeCluster> {
         if self.state.x < 0 || self.state.y < 0 {
             None
@@ -303,6 +391,8 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         }
     }
 
+    /// Write a grapheme cluster to the target assuming that there is enough space to write it
+    /// without any wrapping.
     fn write_grapheme_cluster_unchecked(&mut self, cluster: GraphemeCluster, style: Style) {
         let target_cluster_x = self.state.x;
         let y = self.state.y;
@@ -310,7 +400,10 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             let target_cluster = self.get_current_cell_mut().expect("in bounds");
             let w: Width = Width::new(target_cluster.grapheme_cluster.width() as i32)
                 .expect("width is non-negative");
-            *target_cluster = StyledGraphemeCluster::new(cluster, style);
+            *target_cluster = StyledGraphemeCluster {
+                grapheme_cluster: cluster,
+                style,
+            };
             w
         };
         if old_target_cluster_width != 1 {
@@ -353,10 +446,12 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         // Alternatively: writing to |,a,r] will cause an under/overflow in
         // current_x -= 1;
         //
-        // I will call this good for now, as these problems will likely not (or only rarely) arrise
+        // I will call this good for now, as these problems will likely not (or only rarely) arise
         // in pratice. If they do... we have to think of something...
     }
 
+    /// Write a grapheme cluster to the target at the specified position. The cursor will be
+    /// advanced accordingly. Wrapping and width of the terminal are handled as well.
     fn write_cluster(
         &mut self,
         grapheme_cluster: GraphemeCluster,
@@ -412,6 +507,7 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         Ok(())
     }
 
+    /// Calculate the number of remaining cells in the current line.
     fn remaining_space_in_line(&self) -> Width {
         let x: ColIndex = self.state.x;
         let w: ColIndex = self.window.get_width().from_origin();
@@ -422,6 +518,20 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         }
     }
 
+    /// Write a preformatted slice of styled grapheme clusters to the target at the current cursor
+    /// position.
+    ///
+    /// Be very careful when using this function. Although safety is guaranteed, the program can
+    /// easily panic when using this function in any wrong way.
+    ///
+    /// A safe way to obtain a valid argument for this function would be to implement a
+    /// CursorTarget with a Vec<StyledGraphemeCluster> as a backing store and write to that target
+    /// using a cursor. Any slice whose endpoints are defined by cursor positions which occured
+    /// while writing to this target is valid.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of clusters does not equals its total width
     pub fn write_preformatted(&mut self, clusters: &[StyledGraphemeCluster]) {
         if self.window.get_width() == 0 || self.window.get_height() == 0 {
             return;
@@ -446,6 +556,7 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         }
     }
 
+    /// Write a string to the target at the curren cursor position.
     pub fn write(&mut self, text: &str) {
         if self.window.get_width() == 0 || self.window.get_height() == 0 {
             return;
@@ -483,6 +594,27 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self.wrap_line();
     }
 
+    /// Save the current state of the cursor. The current state will be restored when the returned
+    /// CursorRestorer is dropped.
+    ///
+    /// # Examples:
+    ///
+    /// ```
+    /// use unsegen::base::*;
+    ///
+    /// let mut w = ExtentEstimationWindow::with_width(Width::new(20).unwrap());
+    /// let mut cursor = Cursor::new(&mut w)
+    ///     .position(ColIndex::new(0), RowIndex::new(0));
+    ///
+    /// let old_style = cursor.get_style_modifier();
+    /// {
+    ///     let mut cursor = cursor.save().col().style_modifier();
+    ///     cursor.apply_style_modifier(StyleModifier::new().bold(BoolModifyMode::Toggle));
+    ///     cursor.write("testing, testing, oioioi!");
+    /// }
+    /// assert_eq!(cursor.get_col(), ColIndex::new(0));
+    /// assert_eq!(cursor.get_style_modifier(), old_style);
+    /// ```
     pub fn save<'a>(&'a mut self) -> CursorRestorer<'a, 'c, 'g, T> {
         CursorRestorer::new(self)
     }
@@ -495,6 +627,8 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> ::std::fmt::Write for Cursor<'c, 'g, T> {
     }
 }
 
+/// Guard value used to restore desired state to a cursor at the end of the scope. Created using
+/// Cursor::save.
 #[must_use]
 pub struct CursorRestorer<'a, 'c: 'a, 'g: 'c, T: 'c + CursorTarget> {
     cursor: &'a mut Cursor<'c, 'g, T>,
@@ -505,7 +639,7 @@ pub struct CursorRestorer<'a, 'c: 'a, 'g: 'c, T: 'c + CursorTarget> {
 }
 
 impl<'a, 'c: 'a, 'g: 'c, T: 'c + CursorTarget> CursorRestorer<'a, 'c, 'g, T> {
-    pub fn new(cursor: &'a mut Cursor<'c, 'g, T>) -> Self {
+    fn new(cursor: &'a mut Cursor<'c, 'g, T>) -> Self {
         CursorRestorer {
             cursor: cursor,
             saved_style_modifier: None,
@@ -515,22 +649,30 @@ impl<'a, 'c: 'a, 'g: 'c, T: 'c + CursorTarget> CursorRestorer<'a, 'c, 'g, T> {
         }
     }
 
+    /// Save the current style modifier of the underlying cursor and restore it when this struct is
+    /// dropped.
     pub fn style_modifier(mut self) -> Self {
         self.saved_style_modifier = Some(self.cursor.state.style_modifier);
         self
     }
 
+    /// Save the current line start column of the underlying cursor and restore it when this struct
+    /// is dropped.
     pub fn line_start_column(mut self) -> Self {
         self.saved_line_start_column = Some(self.cursor.state.line_start_column);
         self
     }
 
-    pub fn pos_x(mut self) -> Self {
+    /// Save the current column position of the underlying cursor and restore it when this struct
+    /// is dropped.
+    pub fn col(mut self) -> Self {
         self.saved_pos_x = Some(self.cursor.state.x);
         self
     }
 
-    pub fn pos_y(mut self) -> Self {
+    /// Save the current row position of the underlying cursor and restore it when this struct is
+    /// dropped.
+    pub fn row(mut self) -> Self {
         self.saved_pos_y = Some(self.cursor.state.y);
         self
     }
@@ -723,7 +865,7 @@ mod test {
             |_| {},
             |c| {
                 c.write("沐");
-                c.set_position(ColIndex::new(0), RowIndex::new(0));
+                c.move_to(ColIndex::new(0), RowIndex::new(0));
                 c.write("X");
             },
         );
@@ -733,7 +875,7 @@ mod test {
             |_| {},
             |c| {
                 c.write("沐");
-                c.set_position(ColIndex::new(1), RowIndex::new(0));
+                c.move_to(ColIndex::new(1), RowIndex::new(0));
                 c.write("X");
             },
         );
@@ -743,7 +885,7 @@ mod test {
             |_| {},
             |c| {
                 c.write("沐沐");
-                c.set_position(ColIndex::new(0), RowIndex::new(0));
+                c.move_to(ColIndex::new(0), RowIndex::new(0));
                 c.write("XYZ");
             },
         );
@@ -753,7 +895,7 @@ mod test {
             |_| {},
             |c| {
                 c.write("沐沐");
-                c.set_position(ColIndex::new(1), RowIndex::new(0));
+                c.move_to(ColIndex::new(1), RowIndex::new(0));
                 c.write("XYZ");
             },
         );
@@ -763,7 +905,7 @@ mod test {
             |_| {},
             |c| {
                 c.write("沐沐沐");
-                c.set_position(ColIndex::new(2), RowIndex::new(0));
+                c.move_to(ColIndex::new(2), RowIndex::new(0));
                 c.write("XYZ");
             },
         );
@@ -777,7 +919,7 @@ mod test {
             |c| c.set_tab_column_width(Width::new(4).unwrap()),
             |c| {
                 c.write("\t");
-                c.set_position(ColIndex::new(0), RowIndex::new(0));
+                c.move_to(ColIndex::new(0), RowIndex::new(0));
                 c.write("X");
             },
         );
@@ -787,7 +929,7 @@ mod test {
             |c| c.set_tab_column_width(Width::new(4).unwrap()),
             |c| {
                 c.write("\t");
-                c.set_position(ColIndex::new(1), RowIndex::new(0));
+                c.move_to(ColIndex::new(1), RowIndex::new(0));
                 c.write("X");
             },
         );
@@ -797,7 +939,7 @@ mod test {
             |c| c.set_tab_column_width(Width::new(4).unwrap()),
             |c| {
                 c.write("\t");
-                c.set_position(ColIndex::new(2), RowIndex::new(0));
+                c.move_to(ColIndex::new(2), RowIndex::new(0));
                 c.write("X");
             },
         );
@@ -807,7 +949,7 @@ mod test {
             |c| c.set_tab_column_width(Width::new(4).unwrap()),
             |c| {
                 c.write("\t");
-                c.set_position(ColIndex::new(3), RowIndex::new(0));
+                c.move_to(ColIndex::new(3), RowIndex::new(0));
                 c.write("X");
             },
         );

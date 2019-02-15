@@ -13,7 +13,7 @@ pub struct TextFormat {
     pub invert: bool,
     pub underline: bool,
 
-    // Make users of the library unable to construct RenderingHints from members.
+    // Make users of the library unable to construct Textformat from members.
     // This way we can add members in a backwards compatible way in future versions.
     #[doc(hidden)]
     _do_not_construct: (),
@@ -65,8 +65,8 @@ impl Default for TextFormat {
 /// (In essence, specifies one of all possible unary boolean functions.)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BoolModifyMode {
-    Yes,
-    No,
+    True,
+    False,
     Toggle,
     LeaveUnchanged,
 }
@@ -79,40 +79,50 @@ impl BoolModifyMode {
     /// ```
     /// use unsegen::base::BoolModifyMode;
     ///
-    /// let mut b = true;
-    ///
-    /// BoolModifyMode::False.on_top_of(BoolModifyMode::True).modify(&mut b);
-    /// assert_eq!(b, false);
-    ///
-    /// BoolModifyMode::Toggle.on_top_of(BoolModifyMode::False).modify(&mut b);
-    /// assert_eq!(b, true);
-    ///
-    /// BoolModifyMode::Toggle.on_top_of(BoolModifyMode::Toggle).modify(&mut b);
-    /// assert_eq!(b, true);
-    ///
-    ///
+    /// assert_eq!(BoolModifyMode::LeaveUnchanged.on_top_of(BoolModifyMode::False),
+    ///             BoolModifyMode::False);
     /// assert_eq!(BoolModifyMode::True.on_top_of(BoolModifyMode::Toggle /*or any other value*/),
     ///             BoolModifyMode::True);
     /// assert_eq!(BoolModifyMode::Toggle.on_top_of(BoolModifyMode::Toggle),
     ///             BoolModifyMode::LeaveUnchanged);
     /// ```
     ///
-    fn on_top_of(&self, other: &Self) -> Self {
-        match (*self, *other) {
-            (BoolModifyMode::Yes, _) => BoolModifyMode::Yes,
-            (BoolModifyMode::No, _) => BoolModifyMode::No,
-            (BoolModifyMode::Toggle, BoolModifyMode::Yes) => BoolModifyMode::No,
-            (BoolModifyMode::Toggle, BoolModifyMode::No) => BoolModifyMode::Yes,
-            (BoolModifyMode::Toggle, BoolModifyMode::Toggle) => BoolModifyMode::No,
+    pub fn on_top_of(self, other: Self) -> Self {
+        match (self, other) {
+            (BoolModifyMode::True, _) => BoolModifyMode::True,
+            (BoolModifyMode::False, _) => BoolModifyMode::False,
+            (BoolModifyMode::Toggle, BoolModifyMode::True) => BoolModifyMode::False,
+            (BoolModifyMode::Toggle, BoolModifyMode::False) => BoolModifyMode::True,
+            (BoolModifyMode::Toggle, BoolModifyMode::Toggle) => BoolModifyMode::LeaveUnchanged,
             (BoolModifyMode::Toggle, BoolModifyMode::LeaveUnchanged) => BoolModifyMode::Toggle,
             (BoolModifyMode::LeaveUnchanged, m) => m,
         }
     }
-    fn modify(&self, should_invert: &mut bool) {
-        match *self {
-            BoolModifyMode::Yes => *should_invert = true,
-            BoolModifyMode::No => *should_invert = false,
-            BoolModifyMode::Toggle => *should_invert ^= true,
+
+    /// Modify the target bool according to the modification mode.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::BoolModifyMode;
+    ///
+    /// let mut b = true;
+    /// BoolModifyMode::False.modify(&mut b);
+    /// assert_eq!(b, false);
+    ///
+    /// let mut b = false;
+    /// BoolModifyMode::LeaveUnchanged.modify(&mut b);
+    /// assert_eq!(b, false);
+    ///
+    /// let mut b = false;
+    /// BoolModifyMode::Toggle.modify(&mut b);
+    /// assert_eq!(b, true);
+    /// ```
+    ///
+    pub fn modify(self, target: &mut bool) {
+        match self {
+            BoolModifyMode::True => *target = true,
+            BoolModifyMode::False => *target = false,
+            BoolModifyMode::Toggle => *target ^= true,
             BoolModifyMode::LeaveUnchanged => {}
         }
     }
@@ -121,56 +131,128 @@ impl BoolModifyMode {
 impl ::std::convert::From<bool> for BoolModifyMode {
     fn from(on: bool) -> Self {
         if on {
-            BoolModifyMode::Yes
+            BoolModifyMode::True
         } else {
-            BoolModifyMode::No
+            BoolModifyMode::False
         }
     }
 }
 
+/// Specifies how to modify a text format value.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct TextFormatModifier {
     pub bold: BoolModifyMode,
     pub italic: BoolModifyMode,
     pub invert: BoolModifyMode,
     pub underline: BoolModifyMode,
+
+    // Make users of the library unable to construct TextFormatModifier from members.
+    // This way we can add members in a backwards compatible way in future versions.
+    #[doc(hidden)]
+    _do_not_construct: (),
 }
 
 impl TextFormatModifier {
+    /// Construct a new (not actually) modifier, that leaves all properties unchanged.
     pub fn new() -> Self {
         TextFormatModifier {
             bold: BoolModifyMode::LeaveUnchanged,
             italic: BoolModifyMode::LeaveUnchanged,
             invert: BoolModifyMode::LeaveUnchanged,
             underline: BoolModifyMode::LeaveUnchanged,
+            _do_not_construct: (),
         }
     }
+    /// Set the bold property of the TextFormatModifier
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::{TextFormatModifier, BoolModifyMode};
+    ///
+    /// assert_eq!(TextFormatModifier::new().bold(BoolModifyMode::Toggle).bold,
+    /// BoolModifyMode::Toggle);
+    /// ```
     pub fn bold<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.bold = val.into();
         self
     }
+
+    /// Set the italic property of the TextFormatModifier
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::{TextFormatModifier, BoolModifyMode};
+    ///
+    /// assert_eq!(TextFormatModifier::new().italic(BoolModifyMode::True).italic,
+    /// BoolModifyMode::True);
+    /// ```
     pub fn italic<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.italic = val.into();
         self
     }
+
+    /// Set the invert property of the TextFormatModifier
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::{TextFormatModifier, BoolModifyMode};
+    ///
+    /// assert_eq!(TextFormatModifier::new().invert(BoolModifyMode::False).invert,
+    /// BoolModifyMode::False);
+    /// ```
     pub fn invert<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.invert = val.into();
         self
     }
+
+    /// Set underline invert property of the TextFormatModifier
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::{TextFormatModifier, BoolModifyMode};
+    ///
+    /// assert_eq!(TextFormatModifier::new().underline(BoolModifyMode::LeaveUnchanged).underline,
+    /// BoolModifyMode::LeaveUnchanged);
+    /// ```
     pub fn underline<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.underline = val.into();
         self
     }
-    fn on_top_of(&self, other: &TextFormatModifier) -> Self {
+
+    /// Combine the current value with that of the argument so that the application of the returned
+    /// value is always equivalent to first applying other and then applying self to some TextFormat.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::{TextFormatModifier, TextFormat, BoolModifyMode};
+    ///
+    /// let mut f1 = TextFormat::default();
+    /// let mut f2 = f1;
+    ///
+    /// let m1 =
+    /// TextFormatModifier::new().italic(BoolModifyMode::Toggle).bold(true).underline(false);
+    /// let m2 = TextFormatModifier::new().italic(true).bold(false);
+    ///
+    /// m1.on_top_of(&m2).modify(&mut f1);
+    ///
+    /// m2.modify(&mut f2);
+    /// m1.modify(&mut f2);
+    ///
+    /// assert_eq!(f1, f2);
+    /// ```
+    ///
+    pub fn on_top_of(&self, other: &TextFormatModifier) -> Self {
         TextFormatModifier {
-            bold: self.bold.on_top_of(&other.bold),
-            italic: self.italic.on_top_of(&other.italic),
-            invert: self.invert.on_top_of(&other.invert),
-            underline: self.underline.on_top_of(&other.underline),
+            bold: self.bold.on_top_of(other.bold),
+            italic: self.italic.on_top_of(other.italic),
+            invert: self.invert.on_top_of(other.invert),
+            underline: self.underline.on_top_of(other.underline),
+            _do_not_construct: (),
         }
     }
 
-    fn modify(&self, format: &mut TextFormat) {
+    /// Modify the passed textformat according to the modification rules of self.
+    pub fn modify(&self, format: &mut TextFormat) {
         self.bold.modify(&mut format.bold);
         self.italic.modify(&mut format.italic);
         self.invert.modify(&mut format.invert);
@@ -184,6 +266,14 @@ impl Default for TextFormatModifier {
     }
 }
 
+/// A color that can be displayed in terminal.
+///
+/// Colors are either:
+///     - Named (Black, Yellow, LightRed, ...)
+///     - Ansi (8 bit)
+///     - or Rgb.
+///
+/// Not all terminals may support Rgb, though.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Color {
     Rgb { r: u8, g: u8, b: u8 },
@@ -207,13 +297,23 @@ pub enum Color {
 }
 
 impl Color {
+    /// Construct an ansi color value from rgb values.
+    /// r, g and b must all be < 6.
     pub fn ansi_rgb(r: u8, g: u8, b: u8) -> Self {
+        assert!(r < 6, "Invalid red value");
+        assert!(g < 6, "Invalid green value");
+        assert!(b < 6, "Invalid blue value");
         Color::Ansi(termion::color::AnsiValue::rgb(r, g, b).0)
     }
+
+    /// Construct a gray value ansi color.
+    /// v must be < 24.
     pub fn ansi_grayscale(v: u8 /* < 24 */) -> Self {
+        assert!(v < 24, "Invalid gray value");
         Color::Ansi(termion::color::AnsiValue::grayscale(v).0)
     }
 
+    /// Set the forground color of the terminal.
     fn set_terminal_attributes_fg<W: Write>(&self, terminal: &mut W) -> ::std::io::Result<()> {
         use termion::color::Fg as Target;
         match self {
@@ -237,6 +337,8 @@ impl Color {
             &Color::LightYellow => write!(terminal, "{}", Target(termion::color::LightYellow)),
         }
     }
+
+    /// Set the background color of the terminal.
     fn set_terminal_attributes_bg<W: Write>(&self, terminal: &mut W) -> ::std::io::Result<()> {
         use termion::color::Bg as Target;
         match self {
@@ -262,6 +364,9 @@ impl Color {
     }
 }
 
+/// A style that defines how text is presented on the terminal.
+///
+/// Use StyleModifier to modify the style from the default/plain state.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Style {
     fg_color: Color,
@@ -280,19 +385,13 @@ impl Default for Style {
 }
 
 impl Style {
-    pub fn new(fg_color: Color, bg_color: Color, format: TextFormat) -> Self {
-        Style {
-            fg_color: fg_color,
-            bg_color: bg_color,
-            format: format,
-        }
-    }
-
+    /// Create a "standard" style, i.e., no fancy colors or text attributes.
     pub fn plain() -> Self {
         Self::default()
     }
 
-    pub fn set_terminal_attributes<W: Write>(&self, terminal: &mut W) {
+    /// Set the attributes of the given ANSI terminal to match the current Style.
+    pub(crate) fn set_terminal_attributes<W: Write>(&self, terminal: &mut W) {
         self.fg_color
             .set_terminal_attributes_fg(terminal)
             .expect("write fg_color");
@@ -303,6 +402,8 @@ impl Style {
     }
 }
 
+/// Defines a set of modifications on a style. Multiple modifiers can be combined before applying
+/// them to a style.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct StyleModifier {
     fg_color: Option<Color>,
@@ -311,7 +412,8 @@ pub struct StyleModifier {
 }
 
 impl StyleModifier {
-    pub fn none() -> Self {
+    /// Construct a new (not actually) modifier, that leaves all style properties unchanged.
+    pub fn new() -> Self {
         StyleModifier {
             fg_color: None,
             bg_color: None,
@@ -319,43 +421,122 @@ impl StyleModifier {
         }
     }
 
-    pub fn new() -> Self {
-        Self::none()
-    }
-
+    /// Make the modifier change the foreground color to the specified value.
     pub fn fg_color(mut self, fg_color: Color) -> Self {
         self.fg_color = Some(fg_color);
         self
     }
 
+    /// Make the modifier change the background color to the specified value.
     pub fn bg_color(mut self, bg_color: Color) -> Self {
         self.bg_color = Some(bg_color);
         self
     }
 
+    /// Make the modifier change the textformat of the style to the specified value.
     pub fn format(mut self, format: TextFormatModifier) -> Self {
         self.format = format;
         self
     }
 
-    // Convenience functions to access text format
+    /// Make the modifier change the bold property of the textformat of the style to the specified value.
+    ///
+    /// This is a shortcut for using `format` using a TextFormatModifier that changes the bold
+    /// property.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::{StyleModifier, TextFormatModifier};
+    ///
+    /// let s1 = StyleModifier::new().bold(true);
+    /// let s2 = StyleModifier::new().format(TextFormatModifier::new().bold(true));
+    ///
+    /// assert_eq!(s1, s2);
+    /// ```
     pub fn bold<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.format.bold = val.into();
         self
     }
+
+    /// Make the modifier change the italic property of the textformat of the style to the specified value.
+    ///
+    /// This is a shortcut for using `format` using a TextFormatModifier that changes the italic
+    /// property.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::{StyleModifier, TextFormatModifier};
+    ///
+    /// let s1 = StyleModifier::new().italic(true);
+    /// let s2 = StyleModifier::new().format(TextFormatModifier::new().italic(true));
+    ///
+    /// assert_eq!(s1, s2);
+    /// ```
     pub fn italic<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.format.italic = val.into();
         self
     }
+
+    /// Make the modifier change the invert property of the textformat of the style to the specified value.
+    ///
+    /// This is a shortcut for using `format` using a TextFormatModifier that changes the invert
+    /// property.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::{StyleModifier, TextFormatModifier};
+    ///
+    /// let s1 = StyleModifier::new().invert(true);
+    /// let s2 = StyleModifier::new().format(TextFormatModifier::new().invert(true));
+    ///
+    /// assert_eq!(s1, s2);
+    /// ```
     pub fn invert<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.format.invert = val.into();
         self
     }
+
+    /// Make the modifier change the underline property of the textformat of the style to the specified value.
+    ///
+    /// This is a shortcut for using `format` using a TextFormatModifier that changes the underline
+    /// property.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::{StyleModifier, TextFormatModifier};
+    ///
+    /// let s1 = StyleModifier::new().underline(true);
+    /// let s2 = StyleModifier::new().format(TextFormatModifier::new().underline(true));
+    ///
+    /// assert_eq!(s1, s2);
+    /// ```
     pub fn underline<M: Into<BoolModifyMode>>(mut self, val: M) -> Self {
         self.format.underline = val.into();
         self
     }
 
+    /// Combine the current value with that of the argument so that the application of the returned
+    /// value is always equivalent to first applying other and then applying self to some Style.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    ///
+    /// let mut s1 = Style::default();
+    /// let mut s2 = s1;
+    ///
+    /// let m1 =
+    /// StyleModifier::new().fg_color(Color::Red).italic(BoolModifyMode::Toggle).bold(true).underline(false);
+    /// let m2 = StyleModifier::new().bg_color(Color::Blue).italic(true).bold(false);
+    ///
+    /// m1.on_top_of(&m2).modify(&mut s1);
+    ///
+    /// m2.modify(&mut s2);
+    /// m1.modify(&mut s2);
+    ///
+    /// assert_eq!(s1, s2);
+    /// ```
+    ///
     pub fn on_top_of(&self, other: &StyleModifier) -> Self {
         StyleModifier {
             fg_color: self.fg_color.or(other.fg_color),
@@ -364,18 +545,45 @@ impl StyleModifier {
         }
     }
 
+    /// Apply the modifier to a default (i.e., empty) Style. In a way, this converts the
+    /// StyleModifier to a Style.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    ///
+    /// let m = StyleModifier::new().fg_color(Color::Red).italic(true);
+    /// let mut style = Style::default();
+    ///
+    /// assert_eq!(m.apply(style), m.apply_to_default());
+    /// ```
     pub fn apply_to_default(&self) -> Style {
         let mut style = Style::default();
         self.modify(&mut style);
         style
     }
 
-    pub fn apply(&self, style: &Style) -> Style {
+    /// Apply this modifier to a given style and return the result. This is essentially a
+    /// convenience wrapper around modify, which clones the Style.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    ///
+    /// let m = StyleModifier::new().fg_color(Color::Red).italic(BoolModifyMode::Toggle);
+    /// let mut style = Style::default();
+    /// let style2 = m.apply(style);
+    /// m.modify(&mut style);
+    ///
+    /// assert_eq!(style, style2);
+    /// ```
+    pub fn apply(&self, style: Style) -> Style {
         let mut style = style.clone();
         self.modify(&mut style);
         style
     }
 
+    /// Modify the given style according to the properties of this modifier.
     pub fn modify(&self, style: &mut Style) {
         if let Some(fg) = self.fg_color {
             style.fg_color = fg;

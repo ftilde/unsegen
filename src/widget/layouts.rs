@@ -1,31 +1,20 @@
+//! Basic linear layouting for `Widget`s.
 use super::{ColDemand, Demand, Demand2D, RenderingHints, RowDemand, Widget};
 use base::basic_types::*;
 use base::{GraphemeCluster, StyleModifier, Window};
 use std::cmp::{min, Ord};
 use std::fmt::Debug;
 
-#[derive(Clone)]
-pub enum SeparatingStyle {
-    None,
-    AlternatingStyle(StyleModifier),
-    Draw(GraphemeCluster),
-}
-impl SeparatingStyle {
-    pub fn width(&self) -> Width {
-        match self {
-            &SeparatingStyle::None => Width::new(0).unwrap(),
-            &SeparatingStyle::AlternatingStyle(_) => Width::new(0).unwrap(),
-            &SeparatingStyle::Draw(ref cluster) => cluster.width().into(),
-        }
-    }
-    pub fn height(&self) -> Height {
-        match self {
-            &SeparatingStyle::None => Height::new(0).unwrap(),
-            &SeparatingStyle::AlternatingStyle(_) => Height::new(0).unwrap(),
-            &SeparatingStyle::Draw(_) => Height::new(1).unwrap(),
-        }
-    }
-}
+/// Compute assigned lengths for the given demands in one dimension of size `available_space`.
+///
+/// Between each length, a gap of `separator_width` will be assumed.
+///
+/// This (somewhat ad-hoc) algorithm tries to satisfy these requirements in the following order:
+///
+/// 1. Each demand should be treated equally.
+/// 2. Every demands minimum should be honored.
+/// 3. Each demand should be treated equally, but the assigned length shall not exceed the maximum.
+/// 4. All space will be distributed.
 pub fn layout_linearly<T: AxisDimension + Ord + Debug + Clone>(
     mut available_space: PositiveAxisDiff<T>,
     separator_width: PositiveAxisDiff<T>,
@@ -156,6 +145,7 @@ pub fn layout_linearly<T: AxisDimension + Ord + Debug + Clone>(
     assigned_spaces
 }
 
+/// Draw the widgets in the given window in a linear layout.
 fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
     window: Window,
     widgets: &[(&Widget, RenderingHints)],
@@ -210,9 +200,11 @@ fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
     }
 }
 
+/// A Layout that can be used to draw widgets horizontally, side by side on a window.
 pub struct HorizontalLayout {
     separating_style: SeparatingStyle,
 }
+
 impl HorizontalLayout {
     pub fn new(separating_style: SeparatingStyle) -> Self {
         HorizontalLayout {
@@ -220,6 +212,10 @@ impl HorizontalLayout {
         }
     }
 
+    /// Return the current demand for (rectangular) screen estate.
+    ///
+    /// Similar to Widget::space_demand, but with a different signature, as the layout does not own
+    /// the widgets.
     pub fn space_demand(&self, widgets: &[&Widget]) -> Demand2D {
         let mut total_x = ColDemand::exact(0);
         let mut total_y = RowDemand::exact(0);
@@ -239,6 +235,7 @@ impl HorizontalLayout {
         }
     }
 
+    /// Draw the given widgets to the window, side by side, from left to right.
     pub fn draw(&self, window: Window, widgets: &[(&Widget, RenderingHints)]) {
         draw_linearly(
             window,
@@ -252,6 +249,7 @@ impl HorizontalLayout {
     }
 }
 
+/// A Layout that can be used to draw widgets vertically, one ontop the other, on a window.
 pub struct VerticalLayout {
     separating_style: SeparatingStyle,
 }
@@ -263,6 +261,10 @@ impl VerticalLayout {
         }
     }
 
+    /// Return the current demand for (rectangular) screen estate.
+    ///
+    /// Similar to Widget::space_demand, but with a different signature, as the layout does not own
+    /// the widgets.
     pub fn space_demand(&self, widgets: &[&Widget]) -> Demand2D {
         let mut total_x = Demand::exact(0);
         let mut total_y = Demand::exact(0);
@@ -282,6 +284,7 @@ impl VerticalLayout {
         }
     }
 
+    /// Draw the given widgets to the window, from top to bottom.
     pub fn draw(&self, window: Window, widgets: &[(&Widget, RenderingHints)]) {
         draw_linearly(
             window,
@@ -292,6 +295,37 @@ impl VerticalLayout {
             SeparatingStyle::height,
             |d| d.height,
         );
+    }
+}
+
+/// Variants on how to distinguish two neighboring widgets when drawing them to a window.
+#[derive(Clone)]
+pub enum SeparatingStyle {
+    /// Do nothing to distinguish them
+    None,
+    /// Modify the style of every second widget
+    AlternatingStyle(StyleModifier),
+    /// Draw a line using the specified GraphemeCluster
+    Draw(GraphemeCluster),
+}
+impl SeparatingStyle {
+    /// The required additional width when using this style to separate widgets in a horizontal
+    /// layout.
+    pub fn width(&self) -> Width {
+        match self {
+            &SeparatingStyle::None => Width::new(0).unwrap(),
+            &SeparatingStyle::AlternatingStyle(_) => Width::new(0).unwrap(),
+            &SeparatingStyle::Draw(ref cluster) => cluster.width().into(),
+        }
+    }
+    /// The required additional height when using this style to separate widgets in a vertical
+    /// layout.
+    pub fn height(&self) -> Height {
+        match self {
+            &SeparatingStyle::None => Height::new(0).unwrap(),
+            &SeparatingStyle::AlternatingStyle(_) => Height::new(0).unwrap(),
+            &SeparatingStyle::Draw(_) => Height::new(1).unwrap(),
+        }
     }
 }
 

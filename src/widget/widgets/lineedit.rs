@@ -122,7 +122,7 @@ impl Widget for LineEdit {
             text_width(&self.text[0..maybe_after_cursor_offset.unwrap_or(self.text.len())]);
         let draw_cursor_start_pos = ::std::cmp::min(
             ColIndex::new(0),
-            (window.get_width() - text_width_before_cursor as i32 - right_padding).from_origin(),
+            (window.get_width() - text_width_before_cursor - right_padding).from_origin(),
         );
 
         let cursor_style = match (hints.active, hints.blink) {

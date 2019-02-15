@@ -1,3 +1,4 @@
+//! This module contains several basic widgets that are built into the core library.
 pub mod lineedit;
 pub mod linelabel;
 pub mod logviewer;

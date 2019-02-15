@@ -2,10 +2,10 @@
 use super::{CursorTarget, GraphemeCluster, Style, StyleModifier};
 use base::basic_types::*;
 use base::cursor::{UNBOUNDED_HEIGHT, UNBOUNDED_WIDTH};
-use base::ranges::{Bound, RangeArgument};
 use ndarray::{Array, ArrayViewMut, Axis, Ix, Ix2};
 use std::cmp::max;
 use std::fmt;
+use std::ops::{Bound, RangeBounds};
 
 /// A GraphemeCluster with an associated style.
 #[derive(Clone, Debug, PartialEq)]
@@ -140,30 +140,30 @@ impl<'w> Window<'w> {
     ///
     /// Panics on invalid ranges, i.e., if:
     /// start > end, start < 0, or end > [width of the window]
-    pub fn create_subwindow<'a, WX: RangeArgument<ColIndex>, WY: RangeArgument<RowIndex>>(
+    pub fn create_subwindow<'a, WX: RangeBounds<ColIndex>, WY: RangeBounds<RowIndex>>(
         &'a mut self,
         x_range: WX,
         y_range: WY,
     ) -> Window<'a> {
-        let x_range_start = match x_range.start() {
-            Bound::Unbound => ColIndex::new(0),
-            Bound::Inclusive(i) => i,
-            Bound::Exclusive(i) => i - 1,
+        let x_range_start = match x_range.start_bound() {
+            Bound::Unbounded => ColIndex::new(0),
+            Bound::Included(i) => *i,
+            Bound::Excluded(i) => *i - 1,
         };
-        let x_range_end = match x_range.end() {
-            Bound::Unbound => self.get_width().from_origin(),
-            Bound::Inclusive(i) => i - 1,
-            Bound::Exclusive(i) => i,
+        let x_range_end = match x_range.end_bound() {
+            Bound::Unbounded => self.get_width().from_origin(),
+            Bound::Included(i) => *i - 1,
+            Bound::Excluded(i) => *i,
         };
-        let y_range_start = match y_range.start() {
-            Bound::Unbound => RowIndex::new(0),
-            Bound::Inclusive(i) => i,
-            Bound::Exclusive(i) => i - 1,
+        let y_range_start = match y_range.start_bound() {
+            Bound::Unbounded => RowIndex::new(0),
+            Bound::Included(i) => *i,
+            Bound::Excluded(i) => *i - 1,
         };
-        let y_range_end = match y_range.end() {
-            Bound::Unbound => self.get_height().from_origin(),
-            Bound::Inclusive(i) => i - 1,
-            Bound::Exclusive(i) => i,
+        let y_range_end = match y_range.end_bound() {
+            Bound::Unbounded => self.get_height().from_origin(),
+            Bound::Included(i) => *i - 1,
+            Bound::Excluded(i) => *i,
         };
         assert!(x_range_start <= x_range_end, "Invalid x_range: start > end");
         assert!(y_range_start <= y_range_end, "Invalid y_range: start > end");
@@ -294,9 +294,9 @@ impl<'w> Window<'w> {
     /// use unsegen::base::*;
     /// let mut wb = WindowBuffer::new(Width::new(5).unwrap(), Height::new(5).unwrap());
     /// let mut win = wb.as_window();
-    /// win.set_default_style(Style::new(Color::Red, Color::Blue, TextFormat::default()));
+    /// win.set_default_style(StyleModifier::new().fg_color(Color::Red).bg_color(Color::Blue).apply_to_default());
     /// win.clear();
-    /// // wb is now cleared an has a blue background.
+    /// // wb is now cleared and has a blue background.
     /// ```
     pub fn set_default_style(&mut self, style: Style) {
         self.default_style = style;
@@ -310,7 +310,7 @@ impl<'w> Window<'w> {
     /// use unsegen::base::*;
     /// let mut wb = WindowBuffer::new(Width::new(5).unwrap(), Height::new(5).unwrap());
     /// let mut win = wb.as_window();
-    /// win.set_default_style(Style::new(Color::Red, Color::Blue, TextFormat::default()));
+    /// win.set_default_style(StyleModifier::new().fg_color(Color::Red).bg_color(Color::Blue).apply_to_default());
     /// win.clear();
     /// // wb is now cleared an has a blue background.
     ///
@@ -318,8 +318,8 @@ impl<'w> Window<'w> {
     /// win.clear();
     /// // wb is now cleared an has a yellow background.
     ///
-    /// assert_eq!(win.default_style(),
-    ///     &Style::new(Color::Red, Color::Yellow, TextFormat::default()))
+    /// assert_eq!(*win.default_style(),
+    ///     StyleModifier::new().fg_color(Color::Red).bg_color(Color::Yellow).apply_to_default())
     /// ```
     pub fn modify_default_style(&mut self, modifier: &StyleModifier) {
         modifier.modify(&mut self.default_style);
@@ -358,8 +358,8 @@ impl<'a> CursorTarget for Window<'a> {
             self.values.get((y as usize, x as usize))
         }
     }
-    fn get_default_style(&self) -> &Style {
-        &self.default_style
+    fn get_default_style(&self) -> Style {
+        self.default_style
     }
 }
 
@@ -435,7 +435,7 @@ impl CursorTarget for ExtentEstimationWindow {
             None
         }
     }
-    fn get_default_style(&self) -> &Style {
-        &self.default_style
+    fn get_default_style(&self) -> Style {
+        self.default_style
     }
 }
