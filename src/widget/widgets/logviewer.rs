@@ -1,3 +1,4 @@
+//! A scrollable, append-only buffer of lines.
 use base::basic_types::*;
 use base::{Cursor, Window, WrappingMode};
 use input::{OperationResult, Scrollable};
@@ -5,13 +6,15 @@ use std::fmt;
 use std::ops::Range;
 use widget::{Demand, Demand2D, RenderingHints, Widget};
 
+/// A scrollable, append-only buffer of lines.
 pub struct LogViewer {
-    storage: Vec<String>, // Invariant: always holds at least one line
+    storage: Vec<String>, // Invariant: always holds at least one line, does not contain newlines
     scrollback_position: Option<LineIndex>,
     scroll_step: usize,
 }
 
 impl LogViewer {
+    /// Create an empty `LogViewer`. Add lines by writing to the viewer as `std::io::Write`.
     pub fn new() -> Self {
         let mut storage = Vec::new();
         storage.push(String::new()); //Fullfil invariant (at least one line)
@@ -23,7 +26,7 @@ impl LogViewer {
     }
 
     fn num_lines_stored(&self) -> usize {
-        self.storage.len()
+        self.storage.len() // Per invariant: no newlines in storage
     }
 
     fn current_line_index(&self) -> LineIndex {
@@ -32,11 +35,11 @@ impl LogViewer {
         ))
     }
 
-    pub fn active_line_mut(&mut self) -> &mut String {
-        return self
-            .storage
+    /// Note: Do not insert newlines into the string using this
+    fn active_line_mut(&mut self) -> &mut String {
+        self.storage
             .last_mut()
-            .expect("Invariant: At least one line");
+            .expect("Invariant: At least one line")
     }
 
     fn view(&self, range: Range<LineIndex>) -> &[String] {

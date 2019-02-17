@@ -1,3 +1,6 @@
+//! A table of widgets with static number of columns.
+//!
+//! Use by implementing `TableRow` and adding instances of that type to a `Table` using `rows_mut`.
 use base::basic_types::*;
 use base::{StyleModifier, Window};
 use input::{Behavior, Input, Navigatable, OperationResult};
@@ -6,19 +9,35 @@ use widget::{
     Widget,
 };
 
+/// A single column in a `Table`.
+///
+/// This does not store any data, but rather how to access a cell in a single column of a table
+/// and how it reacts to input.
+///
+/// In a sense this is only necessary because we do not have variadic generics.
 pub struct Column<T: ?Sized> {
+    /// Immutable widget access.
     pub access: fn(&T) -> &Widget,
+    /// Mutable widget access.
     pub access_mut: fn(&mut T) -> &mut Widget,
+    /// Input processing
     pub behavior: fn(&mut T, Input) -> Option<Input>,
 }
 
+/// This trait both (statically) describes the layout of the table (`COLUMNS`) and represents a
+/// single row in the table.
+///
+/// Implement this trait, if you want to create a `Table`!
 pub trait TableRow: 'static {
+    /// Define the behavior of individual columns of the table.
     const COLUMNS: &'static [Column<Self>];
 
+    /// Convenient access using `COLUMNS`. (Do not reimplement this.)
     fn num_columns() -> usize {
         Self::COLUMNS.len()
     }
 
+    /// Calculate the vertical space demand of the current row. (Default: max of all cells.)
     fn height_demand(&self) -> RowDemand {
         let mut y_demand = Demand::zero();
         for col in Self::COLUMNS.iter() {
@@ -29,6 +48,7 @@ pub trait TableRow: 'static {
     }
 }
 
+/// Mutable row access mapper to enforce invariants after mutation.
 pub struct RowsMut<'a, R: 'static + TableRow> {
     table: &'a mut Table<R>,
 }
@@ -39,12 +59,6 @@ impl<'a, R: 'static + TableRow> ::std::ops::Drop for RowsMut<'a, R> {
     }
 }
 
-impl<'a, R: 'static + TableRow> ::std::ops::DerefMut for RowsMut<'a, R> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.table.rows
-    }
-}
-
 impl<'a, R: 'static + TableRow> ::std::ops::Deref for RowsMut<'a, R> {
     type Target = Vec<R>;
     fn deref(&self) -> &Self::Target {
@@ -52,6 +66,21 @@ impl<'a, R: 'static + TableRow> ::std::ops::Deref for RowsMut<'a, R> {
     }
 }
 
+impl<'a, R: 'static + TableRow> ::std::ops::DerefMut for RowsMut<'a, R> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.table.rows
+    }
+}
+
+/// A table of widgets with static number of `Columns`.
+///
+/// In order to create a table, you have to define a type for a row in the table and implement
+/// `TableRow` for it. Then add instances of that type using `rows_mut`.
+///
+/// At any time, a single cell of the table is active. Send user input to the cell by adding the
+/// result of `current_cell_behavior()` to an `InputChain`.
+/// A table is also `Navigatable` by which the user can change which cell is the currently active
+/// one.
 pub struct Table<R: TableRow> {
     rows: Vec<R>,
     row_sep_style: SeparatingStyle,
@@ -62,6 +91,8 @@ pub struct Table<R: TableRow> {
 }
 
 impl<R: TableRow + 'static> Table<R> {
+    /// Create an empty table and specify how rows/columns and the currently active cell will be
+    /// distinguished.
     pub fn new(
         row_sep_style: SeparatingStyle,
         col_sep_style: SeparatingStyle,
@@ -77,10 +108,12 @@ impl<R: TableRow + 'static> Table<R> {
         }
     }
 
+    /// Access the content of the table mutably.
     pub fn rows_mut<'a>(&'a mut self) -> RowsMut<'a, R> {
         RowsMut { table: self }
     }
 
+    /// Access the content of the table immutably.
     pub fn rows(&mut self) -> &Vec<R> {
         &self.rows
     }
@@ -117,10 +150,12 @@ impl<R: TableRow + 'static> Table<R> {
         }
     }
 
+    /// Get mutable access to the currently active row.
     pub fn current_row_mut(&mut self) -> Option<&mut R> {
         self.rows.get_mut(self.row_pos as usize)
     }
 
+    /// Get the currently active column.
     pub fn current_col(&self) -> &'static Column<R> {
         &R::COLUMNS[self.col_pos as usize]
     }
@@ -134,11 +169,14 @@ impl<R: TableRow + 'static> Table<R> {
         }
     }
 
+    /// Create a `Behavior` which can be used to send input directly to the currently active cell
+    /// by adding it to an `InputChain`.
     pub fn current_cell_behavior<'a>(&'a mut self) -> CurrentCellBehavior<'a, R> {
         CurrentCellBehavior { table: self }
     }
 }
 
+/// Pass all behavior to the currently active cell.
 pub struct CurrentCellBehavior<'a, R: TableRow + 'static> {
     table: &'a mut Table<R>,
 }

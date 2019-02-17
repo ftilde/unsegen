@@ -1,3 +1,4 @@
+//! A user-editable line of text.
 use base::basic_types::*;
 use base::{BoolModifyMode, Cursor, StyleModifier, Window};
 use input::{Editable, Navigatable, OperationResult, Writable};
@@ -6,6 +7,10 @@ use widget::{
     count_grapheme_clusters, text_width, Blink, Demand, Demand2D, RenderingHints, Widget,
 };
 
+/// A user-editable line of text.
+///
+/// In addition to the current text, the `LineEdit` has a concept of a cursor whose position can
+/// change, but is always on a grapheme cluster in the current text.
 pub struct LineEdit {
     text: String,
     cursor_pos: usize,
@@ -15,6 +20,7 @@ pub struct LineEdit {
 }
 
 impl LineEdit {
+    /// Create with default cursor style: Underline position when inactive and invert on blink.
     pub fn new() -> Self {
         Self::with_cursor_styles(
             StyleModifier::new().invert(BoolModifyMode::Toggle),
@@ -23,6 +29,14 @@ impl LineEdit {
         )
     }
 
+    /// Create with the specified style for the cursor.
+    ///
+    /// Three styles have to be specified for the three possible states (in terms of rendering) of
+    /// the cursor:
+    ///
+    /// 1. Active, and during an "on"-blink cycle.
+    /// 2. Active, and during an "off"-blink cycle.
+    /// 3. Inactive.
     pub fn with_cursor_styles(
         active_blink_on: StyleModifier,
         active_blink_off: StyleModifier,
@@ -37,23 +51,29 @@ impl LineEdit {
         }
     }
 
+    /// Get the current content.
     pub fn get(&self) -> &str {
         &self.text
     }
 
+    /// Set (and overwrite) the current content. The cursor will be placed at the very end of the
+    /// line.
     pub fn set(&mut self, text: &str) {
         self.text = text.to_owned();
         self.move_cursor_to_end_of_line();
     }
 
+    /// Move the cursor to the end, i.e., *behind* the last grapheme cluster.
     pub fn move_cursor_to_end_of_line(&mut self) {
         self.cursor_pos = count_grapheme_clusters(&self.text) as usize;
     }
 
+    /// Move the cursor to the beginning, i.e., *onto* the first grapheme cluster.
     pub fn move_cursor_to_beginning_of_line(&mut self) {
         self.cursor_pos = 0;
     }
 
+    /// Move the cursor one grapheme cluster to the right if possible.
     pub fn move_cursor_right(&mut self) -> Result<(), ()> {
         let new_pos = self.cursor_pos + 1;
         if new_pos <= count_grapheme_clusters(&self.text) as usize {
@@ -64,6 +84,7 @@ impl LineEdit {
         }
     }
 
+    /// Move the cursor one grapheme cluster to the left if possible.
     pub fn move_cursor_left(&mut self) -> Result<(), ()> {
         if self.cursor_pos > 0 {
             self.cursor_pos -= 1;
@@ -73,6 +94,7 @@ impl LineEdit {
         }
     }
 
+    /// Insert text directly *before* the current cursor position
     pub fn insert(&mut self, text: &str) {
         self.text = {
             let grapheme_iter = self.text.graphemes(true);
@@ -85,6 +107,7 @@ impl LineEdit {
         };
     }
 
+    /// Erase the grapheme cluster at the specified position.
     fn erase_symbol_at(&mut self, pos: usize) -> Result<(), ()> {
         if pos < self.text.len() {
             self.text = self
@@ -160,6 +183,7 @@ impl Widget for LineEdit {
     }
 }
 
+/// Note that there is no concept of moving up or down for a `LineEdit`.
 impl Navigatable for LineEdit {
     fn move_up(&mut self) -> OperationResult {
         Err(())

@@ -1,8 +1,12 @@
+//! A widget implementing "readline"-like functionality.
 use super::super::{Demand2D, HorizontalLayout, RenderingHints, SeparatingStyle, Widget};
 use super::{LineEdit, LineLabel};
 use base::Window;
 use input::{Editable, Navigatable, OperationResult, Scrollable, Writable};
 
+/// A widget implementing "readline"-like functionality.
+///
+/// Basically a more sophisticated version of `LineEdit` with history.
 pub struct PromptLine {
     prompt: LineLabel,
     pub line: LineEdit,
@@ -11,6 +15,8 @@ pub struct PromptLine {
     layout: HorizontalLayout,
 }
 
+/// Saves the current position in the history buffer and the state of the lineedit before scrolling
+/// back through history thus enabling going back to the uncompleted line.
 struct ScrollBackState {
     active_line: String,
     pos: usize,
@@ -26,6 +32,8 @@ impl ScrollBackState {
 }
 
 impl PromptLine {
+    /// Construct a PromptLine with the given symbol that will be displayed left of the `LineEdit`
+    /// for user interaction.
     pub fn with_prompt(prompt: String) -> Self {
         PromptLine {
             prompt: LineLabel::new(prompt),
@@ -36,20 +44,26 @@ impl PromptLine {
         }
     }
 
+    /// Change the symbol left of the user editable section.
     pub fn set_prompt(&mut self, prompt: String) {
         self.prompt = LineLabel::new(prompt);
     }
 
+    /// Get the `n`'th line from the history.
     pub fn previous_line(&self, n: usize) -> Option<&str> {
         self.history
             .get(self.history.len().checked_sub(n).unwrap_or(0))
             .map(String::as_str)
     }
 
+    /// Get the current content of the `LineEdit`
     pub fn active_line(&self) -> &str {
         self.line.get()
     }
 
+    /// Mark the current content as "accepted", e.g., if the user has entered and submitted a command.
+    ///
+    /// This adds the current line to the front of the history buffer.
     pub fn finish_line(&mut self) -> &str {
         if self.history.is_empty()
             || self.line.get() != self.history.last().expect("history is not empty").as_str()
@@ -60,6 +74,7 @@ impl PromptLine {
         &self.history[self.history.len() - 1]
     }
 
+    /// Set the line content according to the current scrollback position
     fn sync_line_to_history_scroll_position(&mut self) {
         if let Some(ref state) = self.history_scroll_position {
             // history[pos] is always valid because of the invariant on history_scroll_pos
@@ -67,6 +82,8 @@ impl PromptLine {
         }
     }
 
+    /// An edit operation changes the state from "we are looking through history" to "we are
+    /// editing a complete new line".
     fn note_edit_operation(&mut self, res: OperationResult) -> OperationResult {
         if res.is_ok() {
             self.history_scroll_position = None;
