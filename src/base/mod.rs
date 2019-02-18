@@ -11,7 +11,7 @@
 //!
 //! {
 //!     let win = term.create_root_window();
-//!     let (mut left, mut right) = win.split(ColIndex::new(5)).unwrap();
+//!     let (left, mut right) = win.split(ColIndex::new(5)).unwrap();
 //!
 //!     let (mut top, mut bottom) = left.split(RowIndex::new(2)).unwrap();
 //!
@@ -28,8 +28,8 @@
 //!     writeln!(cursor, "Hi there!").unwrap();
 //! }
 //! term.present();
-//!
 //! ```
+
 pub mod basic_types;
 pub mod cursor;
 pub mod grapheme_cluster;
