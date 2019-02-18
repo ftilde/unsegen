@@ -235,7 +235,7 @@ impl<R: TableRow + 'static> Widget for Table<R> {
             if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
                 (row_index % 2, &self.row_sep_style)
             {
-                row_window.modify_default_style(&modifier);
+                row_window.modify_default_style(modifier);
             }
 
             let mut iter = R::COLUMNS
@@ -252,12 +252,12 @@ impl<R: TableRow + 'static> Widget for Table<R> {
                 if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
                     (col_index % 2, &self.col_sep_style)
                 {
-                    cell_window.modify_default_style(&modifier);
+                    cell_window.modify_default_style(modifier);
                 }
 
                 let cell_draw_hints =
                     if row_index as u32 == self.row_pos && col_index as u32 == self.col_pos {
-                        cell_window.modify_default_style(&self.focused_style);
+                        cell_window.modify_default_style(self.focused_style);
                         hints
                     } else {
                         hints.active(false)

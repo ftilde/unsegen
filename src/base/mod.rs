@@ -1,5 +1,35 @@
 //! Basic terminal rendering including Terminal setup, "slicing" using Windows, and formatted
 //! writing to Windows using Cursors.
+//!
+//! ```no_run //tests do not provide a fully functional terminal
+//! use unsegen::base::*;
+//! use std::io::stdout;
+//! use std::fmt::Write;
+//!
+//! let stdout = stdout();
+//! let mut term = Terminal::new(stdout.lock());
+//!
+//! {
+//!     let win = term.create_root_window();
+//!     let (mut left, mut right) = win.split(ColIndex::new(5)).unwrap();
+//!
+//!     let (mut top, mut bottom) = left.split(RowIndex::new(2)).unwrap();
+//!
+//!     top.fill(GraphemeCluster::try_from('X').unwrap());
+//!
+//!     bottom.modify_default_style(StyleModifier::new().fg_color(Color::Green));
+//!     bottom.fill(GraphemeCluster::try_from('O').unwrap());
+//!
+//!     let mut cursor = Cursor::new(&mut right)
+//!         .position(ColIndex::new(1), RowIndex::new(2))
+//!         .wrapping_mode(WrappingMode::Wrap)
+//!         .style_modifier(StyleModifier::new().bold(true).bg_color(Color::Red));
+//!
+//!     writeln!(cursor, "Hi there!").unwrap();
+//! }
+//! term.present();
+//!
+//! ```
 pub mod basic_types;
 pub mod cursor;
 pub mod grapheme_cluster;

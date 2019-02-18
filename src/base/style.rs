@@ -233,7 +233,7 @@ impl TextFormatModifier {
     /// TextFormatModifier::new().italic(BoolModifyMode::Toggle).bold(true).underline(false);
     /// let m2 = TextFormatModifier::new().italic(true).bold(false);
     ///
-    /// m1.on_top_of(&m2).modify(&mut f1);
+    /// m1.on_top_of(m2).modify(&mut f1);
     ///
     /// m2.modify(&mut f2);
     /// m1.modify(&mut f2);
@@ -241,7 +241,7 @@ impl TextFormatModifier {
     /// assert_eq!(f1, f2);
     /// ```
     ///
-    pub fn on_top_of(&self, other: &TextFormatModifier) -> Self {
+    pub fn on_top_of(&self, other: TextFormatModifier) -> Self {
         TextFormatModifier {
             bold: self.bold.on_top_of(other.bold),
             italic: self.italic.on_top_of(other.italic),
@@ -529,7 +529,7 @@ impl StyleModifier {
     /// StyleModifier::new().fg_color(Color::Red).italic(BoolModifyMode::Toggle).bold(true).underline(false);
     /// let m2 = StyleModifier::new().bg_color(Color::Blue).italic(true).bold(false);
     ///
-    /// m1.on_top_of(&m2).modify(&mut s1);
+    /// m1.on_top_of(m2).modify(&mut s1);
     ///
     /// m2.modify(&mut s2);
     /// m1.modify(&mut s2);
@@ -537,11 +537,11 @@ impl StyleModifier {
     /// assert_eq!(s1, s2);
     /// ```
     ///
-    pub fn on_top_of(&self, other: &StyleModifier) -> Self {
+    pub fn on_top_of(&self, other: StyleModifier) -> Self {
         StyleModifier {
             fg_color: self.fg_color.or(other.fg_color),
             bg_color: self.bg_color.or(other.bg_color),
-            format: self.format.on_top_of(&other.format),
+            format: self.format.on_top_of(other.format),
         }
     }
 

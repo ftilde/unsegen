@@ -186,7 +186,7 @@ fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
         let (mut window, r) = split(rest_window, pos.from_origin());
         rest_window = r;
         if let (1, &SeparatingStyle::AlternatingStyle(modifier)) = (i % 2, separating_style) {
-            window.modify_default_style(&modifier);
+            window.modify_default_style(modifier);
         }
         window.clear(); // Fill background using new style
         w.draw(window, hint);

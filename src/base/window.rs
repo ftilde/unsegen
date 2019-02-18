@@ -314,14 +314,14 @@ impl<'w> Window<'w> {
     /// win.clear();
     /// // wb is now cleared an has a blue background.
     ///
-    /// win.modify_default_style(&StyleModifier::new().bg_color(Color::Yellow));
+    /// win.modify_default_style(StyleModifier::new().bg_color(Color::Yellow));
     /// win.clear();
     /// // wb is now cleared an has a yellow background.
     ///
     /// assert_eq!(*win.default_style(),
     ///     StyleModifier::new().fg_color(Color::Red).bg_color(Color::Yellow).apply_to_default())
     /// ```
-    pub fn modify_default_style(&mut self, modifier: &StyleModifier) {
+    pub fn modify_default_style(&mut self, modifier: StyleModifier) {
         modifier.modify(&mut self.default_style);
     }
 

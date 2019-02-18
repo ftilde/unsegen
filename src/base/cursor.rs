@@ -255,6 +255,11 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
 
     /// Set the style modifier that will be used when writing cells to the target.
     /// The modifier will be applied to the base style of the target before writing to a cell.
+    pub fn style_modifier(mut self, style_modifier: StyleModifier) -> Self {
+        self.set_style_modifier(style_modifier);
+        self
+    }
+
     pub fn set_style_modifier(&mut self, style_modifier: StyleModifier) {
         self.state.style_modifier = style_modifier;
     }
@@ -265,7 +270,7 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
 
     /// Apply the specified modifier *on_top* of the current modifier.
     pub fn apply_style_modifier(&mut self, style_modifier: StyleModifier) {
-        self.state.style_modifier = style_modifier.on_top_of(&self.state.style_modifier);
+        self.state.style_modifier = style_modifier.on_top_of(self.state.style_modifier);
     }
 
     /// Set how far a tab character ('\t') will move the cursor to the right.
