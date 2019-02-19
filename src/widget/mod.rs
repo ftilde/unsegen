@@ -4,7 +4,7 @@
 //! ```no_run //tests do not provide a fully functional terminal
 //! use unsegen::base::*;
 //! use unsegen::widget::*;
-//! use unsegen::widget::widgets::*;
+//! use unsegen::widget::builtin::*;
 //! use std::io::stdout;
 //!
 //! struct MyWidget {
@@ -47,9 +47,9 @@
 //!     }
 //! }
 //! ```
+pub mod builtin;
 pub mod layouts;
 pub mod widget;
-pub mod widgets;
 
 pub use self::layouts::*;
 pub use self::widget::*;
