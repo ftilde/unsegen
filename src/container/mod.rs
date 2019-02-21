@@ -1,3 +1,4 @@
+//! Compose widgets into multi-widget applications with a concept of "focus".
 pub mod boxdrawing;
 
 use self::boxdrawing::{LineCell, LineSegment, LineType};
@@ -13,10 +14,17 @@ use std::ops::Range;
 use widget::layouts::layout_linearly;
 use widget::{ColDemand, Demand2D, RenderingHints, RowDemand, Widget};
 
+/// Extension to the widget trait to enable passing input to (active) widgets.
+/// The parameter P can be used to manipulate global application state.
 pub trait Container<P: ?Sized>: Widget {
     fn input(&mut self, input: Input, parameters: &mut P) -> Option<Input>;
 }
 
+/// A ContainerProvider stores the individual components (`Container`s) of an application and
+/// allows them to be retrieved based on an index.
+///
+/// Note that every possible value for `Self::Index` must correspond to a valid component. A good
+/// choice for an Index is therefore an enum.
 pub trait ContainerProvider {
     type Parameters;
     type Index: Clone + PartialEq;
@@ -28,6 +36,7 @@ pub trait ContainerProvider {
     const DEFAULT_CONTAINER: Self::Index;
 }
 
+/// A `Behavior` which can be used to pass input to the currently active container.
 pub struct ApplicationBehavior<'a, 'b, 'c, 'd: 'a, C: ContainerProvider + 'a + 'b>
 where
     C::Parameters: 'c,
@@ -37,6 +46,7 @@ where
     parameters: &'c mut C::Parameters,
 }
 
+/// Pass input on to the currently active container.
 impl<'a, 'b, 'c, 'd: 'a, C: ContainerProvider + 'a + 'b> Behavior
     for ApplicationBehavior<'a, 'b, 'c, 'd, C>
 {
@@ -50,6 +60,7 @@ impl<'a, 'b, 'c, 'd: 'a, C: ContainerProvider + 'a + 'b> Behavior
     }
 }
 
+/// A simple rectangle with integer coordinates. Nothing to see here.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rectangle {
     pub x_range: Range<ColIndex>,
@@ -57,12 +68,12 @@ pub struct Rectangle {
 }
 
 impl Rectangle {
-    fn width(&self) -> Width {
+    pub fn width(&self) -> Width {
         (self.x_range.end - self.x_range.start)
             .try_into_positive()
             .expect("range invariant")
     }
-    fn height(&self) -> Height {
+    pub fn height(&self) -> Height {
         (self.y_range.end - self.y_range.start)
             .try_into_positive()
             .expect("range invariant")
@@ -118,18 +129,18 @@ impl Rectangle {
         let y_l = self.y_range.start - 1;
         let y_r = self.y_range.end;
 
-        let west = x_l == x;
-        let east = x_r == x;
-        let north = y_l == y;
-        let south = y_r == y;
-        if east && dir == LineSegment::East
-            || west && dir == LineSegment::West
-            || north && dir == LineSegment::North
-            || south && dir == LineSegment::South
+        let left = x_l == x;
+        let right = x_r == x;
+        let up = y_l == y;
+        let down = y_r == y;
+        if right && dir == LineSegment::Right
+            || left && dir == LineSegment::Left
+            || up && dir == LineSegment::Up
+            || down && dir == LineSegment::Down
         {
             false
         } else {
-            (east || west) && (y_l <= y && y <= y_r) || (north || south) && (x_l <= x && x <= x_r)
+            (right || left) && (y_l <= y && y <= y_r) || (up || down) && (x_l <= x && x <= x_r)
         }
     }
 }
@@ -526,34 +537,34 @@ impl<'a, C: ContainerProvider> Application<'a, C> {
             match line {
                 Line::Horizontal(HorizontalLine { x, y_range }) => {
                     line_canvas.get_mut(x, y_range.start - 1).set(
-                        LineSegment::South,
-                        get_line_type(x, y_range.start - 1, LineSegment::South),
+                        LineSegment::Down,
+                        get_line_type(x, y_range.start - 1, LineSegment::Down),
                     );
                     for y in IndexRange(y_range.start..y_range.end) {
                         line_canvas
                             .get_mut(x, y)
-                            .set(LineSegment::North, get_line_type(x, y, LineSegment::North))
-                            .set(LineSegment::South, get_line_type(x, y, LineSegment::South));
+                            .set(LineSegment::Up, get_line_type(x, y, LineSegment::Up))
+                            .set(LineSegment::Down, get_line_type(x, y, LineSegment::Down));
                     }
                     line_canvas.get_mut(x, y_range.end).set(
-                        LineSegment::North,
-                        get_line_type(x, y_range.end, LineSegment::North),
+                        LineSegment::Up,
+                        get_line_type(x, y_range.end, LineSegment::Up),
                     );
                 }
                 Line::Vertical(VerticalLine { x_range, y }) => {
                     line_canvas.get_mut(x_range.start - 1, y).set(
-                        LineSegment::East,
-                        get_line_type(x_range.start - 1, y, LineSegment::East),
+                        LineSegment::Right,
+                        get_line_type(x_range.start - 1, y, LineSegment::Right),
                     );
                     for x in IndexRange(x_range.start..x_range.end) {
                         line_canvas
                             .get_mut(x, y)
-                            .set(LineSegment::East, get_line_type(x, y, LineSegment::East))
-                            .set(LineSegment::West, get_line_type(x, y, LineSegment::West));
+                            .set(LineSegment::Right, get_line_type(x, y, LineSegment::Right))
+                            .set(LineSegment::Left, get_line_type(x, y, LineSegment::Left));
                     }
                     line_canvas.get_mut(x_range.end, y).set(
-                        LineSegment::West,
-                        get_line_type(x_range.end, y, LineSegment::West),
+                        LineSegment::Left,
+                        get_line_type(x_range.end, y, LineSegment::Left),
                     );
                 }
             }
