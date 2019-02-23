@@ -1,3 +1,5 @@
+//! Higher level window manager like functionality using containers as the combination of widget and input concepts.
+//!
 //! Compose widgets into multi-widget applications using `Containers` and `ContainerManager` as the
 //! analogon of a window manager.
 //!
