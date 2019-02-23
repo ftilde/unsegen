@@ -1,7 +1,7 @@
 //! Raw terminal input events, common abstractions for application (component) behavior and means
 //! to easily distribute events.
 //!
-//! # Examples:
+//! # Example:
 //! ```
 //! use unsegen::input::*;
 //! use std::io::Read;

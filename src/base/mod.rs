@@ -1,6 +1,7 @@
 //! Basic terminal rendering including Terminal setup, "slicing" using Windows, and formatted
 //! writing to Windows using Cursors.
 //!
+//! # Example:
 //! ```no_run //tests do not provide a fully functional terminal
 //! use unsegen::base::*;
 //! use std::io::stdout;

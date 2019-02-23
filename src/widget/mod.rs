@@ -1,6 +1,7 @@
 //! Widget abstraction and some basic Widgets useful for creating basic building blocks of text
 //! user interfaces.
 //!
+//! # Example:
 //! ```no_run //tests do not provide a fully functional terminal
 //! use unsegen::base::*;
 //! use unsegen::widget::*;
