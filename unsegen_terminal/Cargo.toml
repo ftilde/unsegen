@@ -1,10 +1,12 @@
 [package]
-name = "unsegen-signals"
+name = "unsegen_terminal"
 version = "0.0.1"
 authors = ["ftilde <ftilde@protonmail.com>"]
 
 [dependencies]
+nix = "0.7"
 libc = "0.2"
+vte = "0.3"
 
 [dependencies.unsegen]
 path = ".."

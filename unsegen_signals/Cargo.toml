@@ -1,10 +1,10 @@
 [package]
-name = "unsegen-pager"
-version = "0.1.0"
+name = "unsegen_signals"
+version = "0.0.1"
 authors = ["ftilde <ftilde@protonmail.com>"]
 
 [dependencies]
-syntect = "2.0"
+libc = "0.2"
 
 [dependencies.unsegen]
 path = ".."
