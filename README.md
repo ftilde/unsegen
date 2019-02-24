@@ -14,10 +14,10 @@ The library consists of four modules:
 
 The following libraries are built on top of unsegen and provide higher level functionality:
 
-* `unsegen_jsonviewer` provides an interactive widget that can be used to display json values.
-* `unsegen_pager` provides a memory or file backed line buffer viewer with syntax highlighting and line decorations.
-* `unsegen_signals` uses unsegen's input module to raise signals on the usual key combinations (e.g., SIGINT on CTRL-C).
-* `unsegen_terminal` provides a pseudoterminal that can be easily integrated into applications using unsegen.
+* [unsegen_jsonviewer](https://crates.io/crates/unsegen_jsonviewer) provides an interactive widget that can be used to display json values.
+* [unsegen_pager](https://crates.io/crates/unsegen_pager) provides a memory or file backed line buffer viewer with syntax highlighting and line decorations.
+* [unsegen_signals](https://crates.io/crates/unsegen_signals) uses unsegen's input module to raise signals on the usual key combinations (e.g., SIGINT on CTRL-C).
+* [unsegen_terminal](https://crates.io/crates/unsegen_terminal) provides a pseudoterminal that can be easily integrated into applications using unsegen.
 
 ## Getting Started
 
