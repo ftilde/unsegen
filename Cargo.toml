@@ -3,6 +3,14 @@ name = "unsegen"
 version = "0.0.1"
 authors = ["ftilde <ftilde@protonmail.com>"]
 
+description = "Another tui library"
+documentation = "https://docs.rs/unsegen"
+repository = "https://github.com/ftilde/unsegen"
+readme = "README.md"
+license = "MIT"
+license-file = "LICENSE"
+keywords = ["terminal", "tui"]
+
 [dependencies]
 ndarray = "0.8"
 nix = "0.8"
