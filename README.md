@@ -24,7 +24,7 @@ The following libraries are built on top of unsegen and provide higher level fun
 `unsegen` is [available on crates.io](https://crates.io/crates/unsegen). You can install it by adding this line to your `Cargo.toml`:
 
 ```toml
-unsegen = "0.1"
+unsegen = "0.0.1"
 ```
 
 ## Examples
