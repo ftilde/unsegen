@@ -1,7 +1,8 @@
 # unsegen
 
-[![](https://docs.rs/unsegen/badge.svg)](https://docs.rs/unsegen/)
 [![](https://img.shields.io/crates/v/unsegen.svg)](https://crates.io/crates/unsegen/)
+[![](https://docs.rs/unsegen/badge.svg)](https://docs.rs/unsegen/)
+[![](https://img.shields.io/crates/l/unsegen.svg)]()
 
 `unsegen` is a library facilitating the creation of text user interface (TUI) applications akin to ncurses.
 Currently, `unsegen` only provides a Rust interface.
