@@ -41,7 +41,7 @@ For a fully fledged application using `unsegen`, you can have a look at [ugdb](h
 
 Here is a screenshot of [ugdb](https://github.com/ftilde/ugdb), which is implemented on top of `unsegen`.
 
-((TODO))
+![](screenshot.png)
 
 ## Some notes on implementation
 
