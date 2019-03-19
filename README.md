@@ -35,13 +35,13 @@ unsegen = "0.0.1"
 
 Here is a screenshot of [ugdb](https://github.com/ftilde/ugdb), which is built on top of `unsegen`.
 
+![](screenshot.png)
+
 ## Examples
 
 There are examples at the top of each main modules' documentation (i.e., [base](https://docs.rs/unsegen/0.0.1/unsegen/base/index.html), [input](https://docs.rs/unsegen/0.0.1/unsegen/input/index.html), [widget](https://docs.rs/unsegen/0.0.1/unsegen/widget/index.html), and [container](https://docs.rs/unsegen/0.0.1/unsegen/container/index.html)) which should be sufficient to get you going.
 
 For a fully fledged application using `unsegen`, you can have a look at [ugdb](https://github.com/ftilde/ugdb), which was developed alongside `unsegen` and the primary motivation for it.
-
-![](screenshot.png)
 
 ## Some notes on implementation
 
