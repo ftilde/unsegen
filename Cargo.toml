@@ -7,7 +7,7 @@ description = "Another tui library"
 documentation = "https://docs.rs/unsegen"
 repository = "https://github.com/ftilde/unsegen"
 readme = "README.md"
-license-file = "LICENSE"
+license = "MIT"
 keywords = ["terminal", "tui"]
 
 [dependencies]
