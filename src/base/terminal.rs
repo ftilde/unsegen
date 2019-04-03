@@ -36,19 +36,24 @@ use nix::unistd::getpgrp;
 
 /// A type providing an interface to the underlying physical terminal.
 /// This also provides the entry point for any rendering to the terminal buffer.
-pub struct Terminal<'a> {
+pub struct Terminal<'a, T = StdoutLock<'a>>
+where
+    T: Write,
+{
     values: WindowBuffer,
-    terminal: RawTerminal<StdoutLock<'a>>,
+    terminal: RawTerminal<T>,
     size_has_changed_since_last_present: bool,
+    _phantom: ::std::marker::PhantomData<&'a ()>,
 }
 
-impl<'a> Terminal<'a> {
+impl<'a, T: Write> Terminal<'a, T> {
     /// Create a new terminal. The terminal takes control of stdout and performs all output on it.
-    pub fn new(stdout: StdoutLock<'a>) -> Self {
+    pub fn new(stdout: T) -> Self {
         let mut term = Terminal {
             values: WindowBuffer::new(Width::new(0).unwrap(), Height::new(0).unwrap()),
             terminal: stdout.into_raw_mode().expect("raw terminal"),
             size_has_changed_since_last_present: true,
+            _phantom: Default::default(),
         };
         term.setup_terminal().expect("Setup terminal");
         term
@@ -168,7 +173,7 @@ impl<'a> Terminal<'a> {
     }
 }
 
-impl<'a> Drop for Terminal<'a> {
+impl<'a, T: Write> Drop for Terminal<'a, T> {
     fn drop(&mut self) {
         let _ = self.restore_terminal();
     }
