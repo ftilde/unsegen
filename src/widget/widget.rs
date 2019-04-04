@@ -208,3 +208,73 @@ pub struct Demand2D {
     pub width: ColDemand,
     pub height: RowDemand,
 }
+
+impl Demand2D {
+    /// Combine two `Demand2D`s by accumulating the height and making the width accommodate both.
+    ///
+    /// This is useful two compute the combined  `Demand2D` of two widgets arranged on top of each
+    /// other.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    /// use unsegen::widget::*;
+    ///
+    /// let d1 = Demand2D {
+    ///     width: ColDemand::exact(5),
+    ///     height: RowDemand::exact(5),
+    /// };
+    /// let d2 = Demand2D {
+    ///     width: ColDemand::at_least(2),
+    ///     height: RowDemand::from_to(3, 5),
+    /// };
+    ///
+    /// assert_eq!(
+    ///     d1.add_vertical(d2),
+    ///     Demand2D {
+    ///         width: ColDemand::at_least(5),
+    ///         height: RowDemand::from_to(8, 10),
+    ///     }
+    /// );
+    /// ```
+    pub fn add_vertical(self, other: Self) -> Self {
+        Demand2D {
+            width: self.width.max(other.width),
+            height: self.height + other.height,
+        }
+    }
+
+    /// Combine two `Demand2D`s by accumulating the width and making the height accommodate both.
+    ///
+    /// This is useful two compute the combined  `Demand2D` of two widgets arranged on top of each
+    /// other.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::base::*;
+    /// use unsegen::widget::*;
+    ///
+    /// let d1 = Demand2D {
+    ///     width: ColDemand::exact(5),
+    ///     height: RowDemand::exact(5),
+    /// };
+    /// let d2 = Demand2D {
+    ///     width: ColDemand::at_least(2),
+    ///     height: RowDemand::from_to(3, 5),
+    /// };
+    ///
+    /// assert_eq!(
+    ///     d1.add_horizontal(d2),
+    ///     Demand2D {
+    ///         width: ColDemand::at_least(7),
+    ///         height: RowDemand::exact(5),
+    ///     }
+    /// );
+    /// ```
+    pub fn add_horizontal(self, other: Self) -> Self {
+        Demand2D {
+            width: self.width + other.width,
+            height: self.height.max(other.height),
+        }
+    }
+}
