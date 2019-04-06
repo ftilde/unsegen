@@ -241,7 +241,7 @@ impl TextFormatModifier {
     /// assert_eq!(f1, f2);
     /// ```
     ///
-    pub fn on_top_of(&self, other: TextFormatModifier) -> Self {
+    pub fn on_top_of(self, other: TextFormatModifier) -> Self {
         TextFormatModifier {
             bold: self.bold.on_top_of(other.bold),
             italic: self.italic.on_top_of(other.italic),
@@ -252,7 +252,7 @@ impl TextFormatModifier {
     }
 
     /// Modify the passed textformat according to the modification rules of self.
-    pub fn modify(&self, format: &mut TextFormat) {
+    pub fn modify(self, format: &mut TextFormat) {
         self.bold.modify(&mut format.bold);
         self.italic.modify(&mut format.italic);
         self.invert.modify(&mut format.invert);
@@ -533,7 +533,7 @@ impl StyleModifier {
     /// assert_eq!(s1, s2);
     /// ```
     ///
-    pub fn on_top_of(&self, other: StyleModifier) -> Self {
+    pub fn on_top_of(self, other: StyleModifier) -> Self {
         StyleModifier {
             fg_color: self.fg_color.or(other.fg_color),
             bg_color: self.bg_color.or(other.bg_color),
@@ -553,7 +553,7 @@ impl StyleModifier {
     ///
     /// assert_eq!(m.apply(style), m.apply_to_default());
     /// ```
-    pub fn apply_to_default(&self) -> Style {
+    pub fn apply_to_default(self) -> Style {
         let mut style = Style::default();
         self.modify(&mut style);
         style
@@ -573,13 +573,13 @@ impl StyleModifier {
     ///
     /// assert_eq!(style, style2);
     /// ```
-    pub fn apply(&self, mut style: Style) -> Style {
+    pub fn apply(self, mut style: Style) -> Style {
         self.modify(&mut style);
         style
     }
 
     /// Modify the given style according to the properties of this modifier.
-    pub fn modify(&self, style: &mut Style) {
+    pub fn modify(self, style: &mut Style) {
         if let Some(fg) = self.fg_color {
             style.fg_color = fg;
         }

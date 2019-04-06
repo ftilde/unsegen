@@ -1,10 +1,13 @@
 # Changelog
 
+All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
+
 ## [Unreleased]
 ### Added
-- Add Default variant to base::Color enum (Breaking change!)
+- Add Default variant to base::Color enum. [BC]
 ### Changed
 - Change Default::default of base::Style to return default foreground and background Colors.
+- Make all methods of base::{Style,Text}FormatModifier take self by value. [BC]
 
 ## [0.1.2] - 2019-04-04
 ### Added
