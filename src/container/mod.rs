@@ -90,7 +90,7 @@
 //!         Box::new(Leaf::new(Index::Left)),
 //!         Box::new(Leaf::new(Index::Right)),
 //!     ])));
-//!     let mut term = Terminal::new(stdout.lock());
+//!     let mut term = Terminal::new(stdout.lock()).unwrap();
 //!
 //!     for input in Input::read_all(stdin) {
 //!         let input = input.unwrap();

@@ -8,7 +8,7 @@
 //! use std::fmt::Write;
 //!
 //! let stdout = stdout();
-//! let mut term = Terminal::new(stdout.lock());
+//! let mut term = Terminal::new(stdout.lock()).unwrap();
 //!
 //! {
 //!     let win = term.create_root_window();

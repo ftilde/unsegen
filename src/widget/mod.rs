@@ -29,7 +29,7 @@
 //!
 //! fn main() {
 //!     let stdout = stdout();
-//!     let mut term = Terminal::new(stdout.lock());
+//!     let mut term = Terminal::new(stdout.lock()).unwrap();
 //!     let mut widget = MyWidget {
 //!         layout: VerticalLayout::new(
 //!             SeparatingStyle::AlternatingStyle(StyleModifier::new().invert(true))

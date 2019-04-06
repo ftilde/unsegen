@@ -9,7 +9,7 @@
 //! use unsegen::base::Terminal;
 //! use std::io::stdout;
 //! let stdout = stdout();
-//! let mut term = Terminal::new(stdout.lock());
+//! let mut term = Terminal::new(stdout.lock()).unwrap();
 //!
 //! let mut done = false;
 //! while !done {
@@ -47,16 +47,20 @@ where
 }
 
 impl<'a, T: Write> Terminal<'a, T> {
-    /// Create a new terminal. The terminal takes control of stdout and performs all output on it.
-    pub fn new(stdout: T) -> Self {
+    /// Create a new terminal. The terminal takes control of the provided io sink (usually stdout)
+    /// and performs all output on it.
+    ///
+    /// If the terminal cannot be created (e.g., because the provided io sink does not allow for
+    /// setting up raw mode), the error is returned.
+    pub fn new(sink: T) -> io::Result<Self> {
         let mut term = Terminal {
             values: WindowBuffer::new(Width::new(0).unwrap(), Height::new(0).unwrap()),
-            terminal: stdout.into_raw_mode().expect("raw terminal"),
+            terminal: sink.into_raw_mode()?,
             size_has_changed_since_last_present: true,
             _phantom: Default::default(),
         };
-        term.setup_terminal().expect("Setup terminal");
-        term
+        term.setup_terminal()?;
+        Ok(term)
     }
 
     /// This method is intended to be called when the process received a SIGTSTP.
@@ -69,26 +73,25 @@ impl<'a, T: Write> Terminal<'a, T> {
     /// for them in a separate thread which sends the events into some fifo. The fifo can be polled
     /// in an event loop. Then, if in the main event loop a SIGTSTP turn up, *this* function should
     /// be called.
-    pub fn handle_sigtstp(&mut self) {
-        self.restore_terminal().expect("Restore terminal");
+    pub fn handle_sigtstp(&mut self) -> io::Result<()> {
+        self.restore_terminal()?;
 
         let mut stop_and_cont = SigSet::empty();
         stop_and_cont.add(SIGCONT);
         stop_and_cont.add(SIGTSTP);
 
         // 1. Unblock SIGTSTP and SIGCONT, so that we actually stop when we receive another SIGTSTP
-        pthread_sigmask(SigmaskHow::SIG_UNBLOCK, Some(&stop_and_cont), None)
-            .expect("Unblock signals");
+        pthread_sigmask(SigmaskHow::SIG_UNBLOCK, Some(&stop_and_cont), None)?;
 
         // 2. Reissue SIGTSTP (this time to whole the process group!)...
-        kill(-getpgrp(), SIGTSTP).expect("SIGTSTP self");
+        kill(-getpgrp(), SIGTSTP)?;
         // ... and stop!
         // Now we are waiting for a SIGCONT.
 
         // 3. Once we receive a SIGCONT we block SIGTSTP and SIGCONT again and resume.
-        pthread_sigmask(SigmaskHow::SIG_BLOCK, Some(&stop_and_cont), None).expect("Block signals");
+        pthread_sigmask(SigmaskHow::SIG_BLOCK, Some(&stop_and_cont), None)?;
 
-        self.setup_terminal().expect("Setup terminal");
+        self.setup_terminal()
     }
 
     /// Set up the terminal for "full screen" work (i.e., hide cursor, switch to alternate screen).
@@ -169,7 +172,7 @@ impl<'a, T: Write> Terminal<'a, T> {
             current_style.set_terminal_attributes(&mut self.terminal);
             write!(self.terminal, "{}", buffer).expect("write leftover buffer contents");
         }
-        self.terminal.flush().expect("flush terminal");
+        let _ = self.terminal.flush();
     }
 }
 
