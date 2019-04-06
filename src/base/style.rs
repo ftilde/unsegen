@@ -21,7 +21,7 @@ pub struct TextFormat {
 
 impl TextFormat {
     /// Set the attributes of the given ANSI terminal to match the current TextFormat.
-    fn set_terminal_attributes<W: Write>(&self, terminal: &mut W) {
+    fn set_terminal_attributes<W: Write>(self, terminal: &mut W) {
         if self.bold {
             write!(terminal, "{}", termion::style::Bold).expect("set bold style");
         } else {
@@ -269,6 +269,7 @@ impl Default for TextFormatModifier {
 /// A color that can be displayed in terminal.
 ///
 /// Colors are either:
+///     - Default (i.e., terminal color is reset)
 ///     - Named (Black, Yellow, LightRed, ...)
 ///     - Ansi (8 bit)
 ///     - or Rgb.
@@ -276,6 +277,7 @@ impl Default for TextFormatModifier {
 /// Not all terminals may support Rgb, though.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Color {
+    Default,
     Rgb { r: u8, g: u8, b: u8 },
     Ansi(u8),
     Black,
@@ -296,6 +298,12 @@ pub enum Color {
     LightYellow,
 }
 
+impl Default for Color {
+    fn default() -> Self {
+        Color::Default
+    }
+}
+
 impl Color {
     /// Construct an ansi color value from rgb values.
     /// r, g and b must all be < 6.
@@ -314,52 +322,54 @@ impl Color {
     }
 
     /// Set the forground color of the terminal.
-    fn set_terminal_attributes_fg<W: Write>(&self, terminal: &mut W) -> ::std::io::Result<()> {
+    fn set_terminal_attributes_fg<W: Write>(self, terminal: &mut W) -> ::std::io::Result<()> {
         use termion::color::Fg as Target;
         match self {
-            &Color::Rgb { r, g, b } => write!(terminal, "{}", Target(termion::color::Rgb(r, g, b))),
-            &Color::Ansi(v) => write!(terminal, "{}", Target(termion::color::AnsiValue(v))),
-            &Color::Black => write!(terminal, "{}", Target(termion::color::Black)),
-            &Color::Blue => write!(terminal, "{}", Target(termion::color::Blue)),
-            &Color::Cyan => write!(terminal, "{}", Target(termion::color::Cyan)),
-            &Color::Magenta => write!(terminal, "{}", Target(termion::color::Magenta)),
-            &Color::Green => write!(terminal, "{}", Target(termion::color::Green)),
-            &Color::Red => write!(terminal, "{}", Target(termion::color::Red)),
-            &Color::White => write!(terminal, "{}", Target(termion::color::White)),
-            &Color::Yellow => write!(terminal, "{}", Target(termion::color::Yellow)),
-            &Color::LightBlack => write!(terminal, "{}", Target(termion::color::LightBlack)),
-            &Color::LightBlue => write!(terminal, "{}", Target(termion::color::LightBlue)),
-            &Color::LightCyan => write!(terminal, "{}", Target(termion::color::LightCyan)),
-            &Color::LightMagenta => write!(terminal, "{}", Target(termion::color::LightMagenta)),
-            &Color::LightGreen => write!(terminal, "{}", Target(termion::color::LightGreen)),
-            &Color::LightRed => write!(terminal, "{}", Target(termion::color::LightRed)),
-            &Color::LightWhite => write!(terminal, "{}", Target(termion::color::LightWhite)),
-            &Color::LightYellow => write!(terminal, "{}", Target(termion::color::LightYellow)),
+            Color::Default => write!(terminal, "{}", Target(termion::color::Reset)),
+            Color::Rgb { r, g, b } => write!(terminal, "{}", Target(termion::color::Rgb(r, g, b))),
+            Color::Ansi(v) => write!(terminal, "{}", Target(termion::color::AnsiValue(v))),
+            Color::Black => write!(terminal, "{}", Target(termion::color::Black)),
+            Color::Blue => write!(terminal, "{}", Target(termion::color::Blue)),
+            Color::Cyan => write!(terminal, "{}", Target(termion::color::Cyan)),
+            Color::Magenta => write!(terminal, "{}", Target(termion::color::Magenta)),
+            Color::Green => write!(terminal, "{}", Target(termion::color::Green)),
+            Color::Red => write!(terminal, "{}", Target(termion::color::Red)),
+            Color::White => write!(terminal, "{}", Target(termion::color::White)),
+            Color::Yellow => write!(terminal, "{}", Target(termion::color::Yellow)),
+            Color::LightBlack => write!(terminal, "{}", Target(termion::color::LightBlack)),
+            Color::LightBlue => write!(terminal, "{}", Target(termion::color::LightBlue)),
+            Color::LightCyan => write!(terminal, "{}", Target(termion::color::LightCyan)),
+            Color::LightMagenta => write!(terminal, "{}", Target(termion::color::LightMagenta)),
+            Color::LightGreen => write!(terminal, "{}", Target(termion::color::LightGreen)),
+            Color::LightRed => write!(terminal, "{}", Target(termion::color::LightRed)),
+            Color::LightWhite => write!(terminal, "{}", Target(termion::color::LightWhite)),
+            Color::LightYellow => write!(terminal, "{}", Target(termion::color::LightYellow)),
         }
     }
 
     /// Set the background color of the terminal.
-    fn set_terminal_attributes_bg<W: Write>(&self, terminal: &mut W) -> ::std::io::Result<()> {
+    fn set_terminal_attributes_bg<W: Write>(self, terminal: &mut W) -> ::std::io::Result<()> {
         use termion::color::Bg as Target;
         match self {
-            &Color::Rgb { r, g, b } => write!(terminal, "{}", Target(termion::color::Rgb(r, g, b))),
-            &Color::Ansi(v) => write!(terminal, "{}", Target(termion::color::AnsiValue(v))),
-            &Color::Black => write!(terminal, "{}", Target(termion::color::Black)),
-            &Color::Blue => write!(terminal, "{}", Target(termion::color::Blue)),
-            &Color::Cyan => write!(terminal, "{}", Target(termion::color::Cyan)),
-            &Color::Magenta => write!(terminal, "{}", Target(termion::color::Magenta)),
-            &Color::Green => write!(terminal, "{}", Target(termion::color::Green)),
-            &Color::Red => write!(terminal, "{}", Target(termion::color::Red)),
-            &Color::White => write!(terminal, "{}", Target(termion::color::White)),
-            &Color::Yellow => write!(terminal, "{}", Target(termion::color::Yellow)),
-            &Color::LightBlack => write!(terminal, "{}", Target(termion::color::LightBlack)),
-            &Color::LightBlue => write!(terminal, "{}", Target(termion::color::LightBlue)),
-            &Color::LightCyan => write!(terminal, "{}", Target(termion::color::LightCyan)),
-            &Color::LightMagenta => write!(terminal, "{}", Target(termion::color::LightMagenta)),
-            &Color::LightGreen => write!(terminal, "{}", Target(termion::color::LightGreen)),
-            &Color::LightRed => write!(terminal, "{}", Target(termion::color::LightRed)),
-            &Color::LightWhite => write!(terminal, "{}", Target(termion::color::LightWhite)),
-            &Color::LightYellow => write!(terminal, "{}", Target(termion::color::LightYellow)),
+            Color::Default => write!(terminal, "{}", Target(termion::color::Reset)),
+            Color::Rgb { r, g, b } => write!(terminal, "{}", Target(termion::color::Rgb(r, g, b))),
+            Color::Ansi(v) => write!(terminal, "{}", Target(termion::color::AnsiValue(v))),
+            Color::Black => write!(terminal, "{}", Target(termion::color::Black)),
+            Color::Blue => write!(terminal, "{}", Target(termion::color::Blue)),
+            Color::Cyan => write!(terminal, "{}", Target(termion::color::Cyan)),
+            Color::Magenta => write!(terminal, "{}", Target(termion::color::Magenta)),
+            Color::Green => write!(terminal, "{}", Target(termion::color::Green)),
+            Color::Red => write!(terminal, "{}", Target(termion::color::Red)),
+            Color::White => write!(terminal, "{}", Target(termion::color::White)),
+            Color::Yellow => write!(terminal, "{}", Target(termion::color::Yellow)),
+            Color::LightBlack => write!(terminal, "{}", Target(termion::color::LightBlack)),
+            Color::LightBlue => write!(terminal, "{}", Target(termion::color::LightBlue)),
+            Color::LightCyan => write!(terminal, "{}", Target(termion::color::LightCyan)),
+            Color::LightMagenta => write!(terminal, "{}", Target(termion::color::LightMagenta)),
+            Color::LightGreen => write!(terminal, "{}", Target(termion::color::LightGreen)),
+            Color::LightRed => write!(terminal, "{}", Target(termion::color::LightRed)),
+            Color::LightWhite => write!(terminal, "{}", Target(termion::color::LightWhite)),
+            Color::LightYellow => write!(terminal, "{}", Target(termion::color::LightYellow)),
         }
     }
 }
@@ -367,21 +377,11 @@ impl Color {
 /// A style that defines how text is presented on the terminal.
 ///
 /// Use StyleModifier to modify the style from the default/plain state.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct Style {
     fg_color: Color,
     bg_color: Color,
     format: TextFormat,
-}
-
-impl Default for Style {
-    fn default() -> Self {
-        Style {
-            fg_color: Color::White,
-            bg_color: Color::LightBlack,
-            format: TextFormat::default(),
-        }
-    }
 }
 
 impl Style {
@@ -391,7 +391,7 @@ impl Style {
     }
 
     /// Set the attributes of the given ANSI terminal to match the current Style.
-    pub(crate) fn set_terminal_attributes<W: Write>(&self, terminal: &mut W) {
+    pub(crate) fn set_terminal_attributes<W: Write>(self, terminal: &mut W) {
         self.fg_color
             .set_terminal_attributes_fg(terminal)
             .expect("write fg_color");
@@ -404,7 +404,7 @@ impl Style {
 
 /// Defines a set of modifications on a style. Multiple modifiers can be combined before applying
 /// them to a style.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct StyleModifier {
     fg_color: Option<Color>,
     bg_color: Option<Color>,
@@ -414,11 +414,7 @@ pub struct StyleModifier {
 impl StyleModifier {
     /// Construct a new (not actually) modifier, that leaves all style properties unchanged.
     pub fn new() -> Self {
-        StyleModifier {
-            fg_color: None,
-            bg_color: None,
-            format: TextFormatModifier::new(),
-        }
+        Self::default()
     }
 
     /// Make the modifier change the foreground color to the specified value.
@@ -577,8 +573,7 @@ impl StyleModifier {
     ///
     /// assert_eq!(style, style2);
     /// ```
-    pub fn apply(&self, style: Style) -> Style {
-        let mut style = style.clone();
+    pub fn apply(&self, mut style: Style) -> Style {
         self.modify(&mut style);
         style
     }
