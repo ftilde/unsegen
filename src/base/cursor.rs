@@ -462,17 +462,15 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         grapheme_cluster: GraphemeCluster,
         style: &Style,
     ) -> Result<(), ()> {
-        if !self.window.get_height().origin_range_contains(self.state.y) {
-            // We are below the window already, no space left to write anything
-            return Err(());
-        }
-
         let cluster_width: Width =
             Width::new(grapheme_cluster.width() as i32).expect("width is non-negative");
 
         let space_in_line = self.remaining_space_in_line();
-        if space_in_line < cluster_width {
-            // Overwrite spaces that we could not fill with our (too wide) grapheme cluster
+        if space_in_line < cluster_width
+            && self.window.get_height().origin_range_contains(self.state.y)
+        {
+            // Overwrite spaces that we could not fill with our (too wide) grapheme cluster, but
+            // only if we are within the window
             for _ in 0..({
                 let s: i32 = space_in_line.into();
                 s
