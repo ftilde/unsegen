@@ -462,6 +462,11 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         grapheme_cluster: GraphemeCluster,
         style: &Style,
     ) -> Result<(), ()> {
+        if !self.window.get_height().origin_range_contains(self.state.y) {
+            // We are below the window already, no space left to write anything
+            return Err(());
+        }
+
         let cluster_width: Width =
             Width::new(grapheme_cluster.width() as i32).expect("width is non-negative");
 
@@ -859,6 +864,12 @@ mod test {
             "沐 |沐 ",
             |c| c.set_wrapping_mode(WrappingMode::Wrap),
             |c| c.write("沐沐沐"),
+        );
+        test_cursor(
+            (2, 2),
+            "  |沐",
+            |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write(" 沐 沐"),
         );
     }
 
