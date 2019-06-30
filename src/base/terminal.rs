@@ -26,10 +26,11 @@
 //! ```
 use base::{Height, Style, Width, Window, WindowBuffer};
 use ndarray::Axis;
+use raw_tty::TtyWithGuard;
 use std::io;
 use std::io::{StdoutLock, Write};
+use std::os::unix::io::AsRawFd;
 use termion;
-use termion::raw::{IntoRawMode, RawTerminal};
 
 use nix::sys::signal::{kill, pthread_sigmask, SigSet, SigmaskHow, SIGCONT, SIGTSTP};
 use nix::unistd::getpgrp;
@@ -38,24 +39,26 @@ use nix::unistd::getpgrp;
 /// This also provides the entry point for any rendering to the terminal buffer.
 pub struct Terminal<'a, T = StdoutLock<'a>>
 where
-    T: Write,
+    T: AsRawFd + Write,
 {
     values: WindowBuffer,
-    terminal: RawTerminal<T>,
+    terminal: TtyWithGuard<T>,
     size_has_changed_since_last_present: bool,
     _phantom: ::std::marker::PhantomData<&'a ()>,
 }
 
-impl<'a, T: Write> Terminal<'a, T> {
+impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
     /// Create a new terminal. The terminal takes control of the provided io sink (usually stdout)
     /// and performs all output on it.
     ///
     /// If the terminal cannot be created (e.g., because the provided io sink does not allow for
     /// setting up raw mode), the error is returned.
     pub fn new(sink: T) -> io::Result<Self> {
+        let mut terminal = TtyWithGuard::new(sink)?;
+        terminal.set_raw_mode()?;
         let mut term = Terminal {
             values: WindowBuffer::new(Width::new(0).unwrap(), Height::new(0).unwrap()),
-            terminal: sink.into_raw_mode()?,
+            terminal,
             size_has_changed_since_last_present: true,
             _phantom: Default::default(),
         };
@@ -71,8 +74,8 @@ impl<'a, T: Write> Terminal<'a, T> {
     ///
     /// The usual way to deal with SIGTSTP (and signals in general) is to block them and `waidpid`
     /// for them in a separate thread which sends the events into some fifo. The fifo can be polled
-    /// in an event loop. Then, if in the main event loop a SIGTSTP turn up, *this* function should
-    /// be called.
+    /// in an event loop. Then, if in the main event loop a SIGTSTP turns up, *this* function
+    /// should be called.
     pub fn handle_sigtstp(&mut self) -> io::Result<()> {
         self.restore_terminal()?;
 
@@ -138,8 +141,6 @@ impl<'a, T: Write> Terminal<'a, T> {
 
     /// Present the current buffer content to the actual terminal.
     pub fn present(&mut self) {
-        use std::io::Write;
-
         let mut current_style = Style::default();
 
         if self.size_has_changed_since_last_present {
@@ -176,7 +177,7 @@ impl<'a, T: Write> Terminal<'a, T> {
     }
 }
 
-impl<'a, T: Write> Drop for Terminal<'a, T> {
+impl<'a, T: Write + AsRawFd> Drop for Terminal<'a, T> {
     fn drop(&mut self) {
         let _ = self.restore_terminal();
     }

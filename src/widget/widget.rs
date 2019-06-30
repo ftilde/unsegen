@@ -123,7 +123,6 @@ impl<T: AxisDimension + PartialOrd + Ord> Sum for Demand<T> {
     where
         I: Iterator<Item = Self>,
     {
-        use std::ops::Add;
         iter.fold(Demand::exact(0), Demand::add)
     }
 }
