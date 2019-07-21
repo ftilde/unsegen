@@ -466,16 +466,13 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
             Width::new(grapheme_cluster.width() as i32).expect("width is non-negative");
 
         let space_in_line = self.remaining_space_in_line();
-        if space_in_line < cluster_width
-            && self.window.get_height().origin_range_contains(self.state.y)
-        {
-            // Overwrite spaces that we could not fill with our (too wide) grapheme cluster, but
-            // only if we are within the window
-            for _ in 0..({
-                let s: i32 = space_in_line.into();
-                s
-            }) {
-                self.write_grapheme_cluster_unchecked(GraphemeCluster::space(), style.clone());
+        if space_in_line < cluster_width {
+            // Overwrite spaces that we could not fill with our (too wide) grapheme cluster
+            for _ in 0i32..space_in_line.into() {
+                // Skip writing grapheme clusters if outside the window
+                if self.window.get_height().origin_range_contains(self.state.y) {
+                    self.write_grapheme_cluster_unchecked(GraphemeCluster::space(), style.clone());
+                }
                 self.state.x += 1;
             }
             if self.state.wrapping_mode == WrappingMode::Wrap {
@@ -564,7 +561,7 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         }
     }
 
-    /// Write a string to the target at the curren cursor position.
+    /// Write a string to the target at the current cursor position.
     pub fn write(&mut self, text: &str) {
         if self.window.get_width() == 0 || self.window.get_height() == 0 {
             return;
@@ -795,6 +792,19 @@ mod test {
             (2, 2),
             "te|st",
             |c| c.set_wrapping_mode(WrappingMode::Wrap),
+            |c| c.write("testy"),
+        );
+    }
+
+    #[test]
+    fn test_cursor_wrap_outside_window() {
+        test_cursor(
+            (2, 2),
+            "st|y_",
+            |c| {
+                c.set_wrapping_mode(WrappingMode::Wrap);
+                c.move_to_y(RowIndex::new(-1));
+            },
             |c| c.write("testy"),
         );
     }
