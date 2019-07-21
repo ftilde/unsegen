@@ -2,7 +2,7 @@
 
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
 
-## [Unreleased]
+## [0.2.1] - 2019-07-21
 ### Fixed
 - Fix wrapping cursor outside of visible window.
 
