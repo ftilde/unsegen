@@ -94,11 +94,11 @@ impl PromptLine {
 
 impl Widget for PromptLine {
     fn space_demand(&self) -> Demand2D {
-        let widgets: Vec<&Widget> = vec![&self.prompt, &self.line];
+        let widgets: Vec<&dyn Widget> = vec![&self.prompt, &self.line];
         self.layout.space_demand(widgets.as_slice())
     }
     fn draw(&self, window: Window, hints: RenderingHints) {
-        let widgets: Vec<(&Widget, RenderingHints)> =
+        let widgets: Vec<(&dyn Widget, RenderingHints)> =
             vec![(&self.prompt, hints), (&self.line, hints)];
         self.layout.draw(window, widgets.as_slice());
     }

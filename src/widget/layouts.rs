@@ -148,7 +148,7 @@ pub fn layout_linearly<T: AxisDimension + Ord + Debug + Clone>(
 /// Draw the widgets in the given window in a linear layout.
 fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
     window: Window,
-    widgets: &[(&Widget, RenderingHints)],
+    widgets: &[(&dyn Widget, RenderingHints)],
     separating_style: &SeparatingStyle,
     split: S,
     window_length: L,
@@ -216,7 +216,7 @@ impl HorizontalLayout {
     ///
     /// Similar to Widget::space_demand, but with a different signature, as the layout does not own
     /// the widgets.
-    pub fn space_demand(&self, widgets: &[&Widget]) -> Demand2D {
+    pub fn space_demand(&self, widgets: &[&dyn Widget]) -> Demand2D {
         let mut total_x = ColDemand::exact(0);
         let mut total_y = RowDemand::exact(0);
         let mut n_elements = 0;
@@ -236,7 +236,7 @@ impl HorizontalLayout {
     }
 
     /// Draw the given widgets to the window, side by side, from left to right.
-    pub fn draw(&self, window: Window, widgets: &[(&Widget, RenderingHints)]) {
+    pub fn draw(&self, window: Window, widgets: &[(&dyn Widget, RenderingHints)]) {
         draw_linearly(
             window,
             widgets,
@@ -265,7 +265,7 @@ impl VerticalLayout {
     ///
     /// Similar to Widget::space_demand, but with a different signature, as the layout does not own
     /// the widgets.
-    pub fn space_demand(&self, widgets: &[&Widget]) -> Demand2D {
+    pub fn space_demand(&self, widgets: &[&dyn Widget]) -> Demand2D {
         let mut total_x = Demand::exact(0);
         let mut total_y = Demand::exact(0);
         let mut n_elements = 0;
@@ -285,7 +285,7 @@ impl VerticalLayout {
     }
 
     /// Draw the given widgets to the window, from top to bottom.
-    pub fn draw(&self, window: Window, widgets: &[(&Widget, RenderingHints)]) {
+    pub fn draw(&self, window: Window, widgets: &[(&dyn Widget, RenderingHints)]) {
         draw_linearly(
             window,
             widgets,
@@ -560,7 +560,7 @@ mod test {
         );
     }
 
-    fn aeq_horizontal_layout_space_demand(widgets: Vec<&Widget>, solution: (ColDemand, RowDemand)) {
+    fn aeq_horizontal_layout_space_demand(widgets: Vec<&dyn Widget>, solution: (ColDemand, RowDemand)) {
         let demand2d = Demand2D {
             width: solution.0,
             height: solution.1,
@@ -596,11 +596,11 @@ mod test {
     }
     fn aeq_horizontal_layout_draw(
         terminal_size: (u32, u32),
-        widgets: Vec<&Widget>,
+        widgets: Vec<&dyn Widget>,
         solution: &str,
     ) {
         let mut term = FakeTerminal::with_size(terminal_size);
-        let widgets_with_hints: Vec<(&Widget, RenderingHints)> = widgets
+        let widgets_with_hints: Vec<(&dyn Widget, RenderingHints)> = widgets
             .into_iter()
             .map(|w| (w, RenderingHints::default()))
             .collect();
@@ -647,7 +647,7 @@ mod test {
         );
     }
 
-    fn aeq_vertical_layout_space_demand(widgets: Vec<&Widget>, solution: (ColDemand, RowDemand)) {
+    fn aeq_vertical_layout_space_demand(widgets: Vec<&dyn Widget>, solution: (ColDemand, RowDemand)) {
         let demand2d = Demand2D {
             width: solution.0,
             height: solution.1,
@@ -681,9 +681,9 @@ mod test {
             (Demand::at_least(5), Demand::at_least(4)),
         );
     }
-    fn aeq_vertical_layout_draw(terminal_size: (u32, u32), widgets: Vec<&Widget>, solution: &str) {
+    fn aeq_vertical_layout_draw(terminal_size: (u32, u32), widgets: Vec<&dyn Widget>, solution: &str) {
         let mut term = FakeTerminal::with_size(terminal_size);
-        let widgets_with_hints: Vec<(&Widget, RenderingHints)> = widgets
+        let widgets_with_hints: Vec<(&dyn Widget, RenderingHints)> = widgets
             .into_iter()
             .map(|w| (w, RenderingHints::default()))
             .collect();

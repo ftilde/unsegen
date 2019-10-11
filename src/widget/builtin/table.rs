@@ -17,9 +17,9 @@ use widget::{
 /// In a sense this is only necessary because we do not have variadic generics.
 pub struct Column<T: ?Sized> {
     /// Immutable widget access.
-    pub access: fn(&T) -> &Widget,
+    pub access: fn(&T) -> &dyn Widget,
     /// Mutable widget access.
-    pub access_mut: fn(&mut T) -> &mut Widget,
+    pub access_mut: fn(&mut T) -> &mut dyn Widget,
     /// Input processing
     pub behavior: fn(&mut T, Input) -> Option<Input>,
 }

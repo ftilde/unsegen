@@ -145,11 +145,11 @@ pub trait Container<P: ?Sized>: Widget {
 pub trait ContainerProvider {
     type Parameters;
     type Index: Clone + PartialEq;
-    fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b Container<Self::Parameters>;
+    fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b dyn Container<Self::Parameters>;
     fn get_mut<'a, 'b: 'a>(
         &'b mut self,
         index: &'a Self::Index,
-    ) -> &'b mut Container<Self::Parameters>;
+    ) -> &'b mut dyn Container<Self::Parameters>;
     const DEFAULT_CONTAINER: Self::Index;
 }
 
@@ -380,14 +380,14 @@ impl<C: ContainerProvider> Layout<C> for Leaf<C> {
 
 /// A `Layout` laying out all children horizontally, separated by vertical lines.
 pub struct HSplit<'a, C: ContainerProvider> {
-    elms: Vec<Box<Layout<C> + 'a>>,
+    elms: Vec<Box<dyn Layout<C> + 'a>>,
 }
 
 impl<'a, C: ContainerProvider> HSplit<'a, C> {
     /// Create a `HSplit` from its children.
     ///
     /// The order of children defines the drawing order from left to right.
-    pub fn new(elms: Vec<Box<Layout<C> + 'a>>) -> Self {
+    pub fn new(elms: Vec<Box<dyn Layout<C> + 'a>>) -> Self {
         HSplit { elms: elms }
     }
 }
@@ -439,14 +439,14 @@ impl<'a, C: ContainerProvider> Layout<C> for HSplit<'a, C> {
 
 /// A `Layout` laying out all children vertically, separated by Horizontal lines.
 pub struct VSplit<'a, C: ContainerProvider> {
-    elms: Vec<Box<Layout<C> + 'a>>,
+    elms: Vec<Box<dyn Layout<C> + 'a>>,
 }
 
 impl<'a, C: ContainerProvider> VSplit<'a, C> {
     /// Create a `VSplit` from its children.
     ///
     /// The order of children defines the drawing order from top to bottom.
-    pub fn new(elms: Vec<Box<Layout<C> + 'a>>) -> Self {
+    pub fn new(elms: Vec<Box<dyn Layout<C> + 'a>>) -> Self {
         VSplit { elms: elms }
     }
 }
@@ -635,7 +635,7 @@ impl Iterator for LineCanvasIter {
 ///
 /// In some sense this is the analogon of a "window manager" for containers.
 pub struct ContainerManager<'a, C: ContainerProvider> {
-    layout: Box<Layout<C> + 'a>,
+    layout: Box<dyn Layout<C> + 'a>,
     active: C::Index,
     last_window_size: Cell<(Width, Height)>,
 }
@@ -643,7 +643,7 @@ pub struct ContainerManager<'a, C: ContainerProvider> {
 impl<'a, C: ContainerProvider> ContainerManager<'a, C> {
     /// Create a `ContainerManager` from a given `Layout`. Initially, the default container is
     /// active.
-    pub fn from_layout(layout_root: Box<Layout<C> + 'a>) -> Self {
+    pub fn from_layout(layout_root: Box<dyn Layout<C> + 'a>) -> Self {
         ContainerManager {
             layout: layout_root,
             active: C::DEFAULT_CONTAINER.clone(),
