@@ -3,6 +3,7 @@ use super::super::{Demand2D, HorizontalLayout, RenderingHints, SeparatingStyle, 
 use super::{LineEdit, LineLabel};
 use base::Window;
 use input::{Editable, Navigatable, OperationResult, Scrollable, Writable};
+use std::ops::{Deref, DerefMut};
 
 /// A widget implementing "readline"-like functionality.
 ///
@@ -215,5 +216,19 @@ impl Editable for PromptLine {
     fn clear(&mut self) -> OperationResult {
         let res = self.line.clear();
         self.note_edit_operation(res)
+    }
+}
+
+impl Deref for PromptLine {
+    type Target = LineEdit;
+
+    fn deref(&self) -> &Self::Target {
+        &self.line
+    }
+}
+
+impl DerefMut for PromptLine {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.line
     }
 }

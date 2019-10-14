@@ -58,9 +58,20 @@ impl LineEdit {
 
     /// Set (and overwrite) the current content. The cursor will be placed at the very end of the
     /// line.
-    pub fn set(&mut self, text: &str) {
-        self.text = text.to_owned();
+    pub fn set(&mut self, text: impl Into<String>) {
+        self.text = text.into();
         self.move_cursor_to_end_of_line();
+    }
+
+    /// Set (and overwrite) the current content. The cursor position (measured in grapheme clusters
+    /// from the start) will be the same, if the new text is shorter or equally long. Otherwise the
+    /// cursor will be positioned at the end of the line.
+    pub fn replace(&mut self, text: impl Into<String>) {
+        // TODO breaking change: somehow merge functionality with replace?
+        self.text = text.into();
+        if self.cursor_pos > count_grapheme_clusters(&self.text) {
+            self.move_cursor_to_end_of_line();
+        }
     }
 
     /// Move the cursor to the end, i.e., *behind* the last grapheme cluster.
@@ -107,9 +118,18 @@ impl LineEdit {
         };
     }
 
-    /// Erase the grapheme cluster at the specified position.
+    /// Returns the byte position of the cursor in the current text (obtainable by `get`)
+    pub fn cursor_pos(&self) -> usize {
+        self.text
+            .grapheme_indices(true)
+            .nth(self.cursor_pos)
+            .map(|(index, _)| index)
+            .unwrap_or_else(|| self.text.len())
+    }
+
+    /// Erase the grapheme cluster at the specified (grapheme cluster) position.
     fn erase_symbol_at(&mut self, pos: usize) -> Result<(), ()> {
-        if pos < self.text.len() {
+        if pos < count_grapheme_clusters(&self.text) {
             self.text = self
                 .text
                 .graphemes(true)
