@@ -5,6 +5,7 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 ### Added
 - Add `LineEdit::replace` as an alternative to `LineEdit::set` tries not to change the cursor position.
 - Add `LineEdit::cursor_pos` to retrieve (byte) cursor position .
+- Add `LineEdit::set_cursor_pos` to set (byte) cursor position .
 - Implement `Deref<Target=LineEdit>` for PromptLine
 ### Fixed
 - Fix erasing characters in `LineEdit`.

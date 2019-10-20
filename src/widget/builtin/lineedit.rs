@@ -127,6 +127,46 @@ impl LineEdit {
             .unwrap_or_else(|| self.text.len())
     }
 
+    /// Set the cursor by specifying its position as the byte position in the displayed string.
+    ///
+    /// If the byte position does not correspond to (the start of) a grapheme cluster in the string
+    /// or the end of the string, an error is returned and the cursor position is left unchanged.
+    ///
+    /// # Examples:
+    /// ```
+    /// use unsegen::widget::builtin::LineEdit;
+    ///
+    /// let mut l = LineEdit::new();
+    /// l.set("löl");
+    /// assert!(l.set_cursor_pos(0).is_ok()); // |löl
+    /// assert!(l.set_cursor_pos(1).is_ok()); // l|öl
+    /// assert!(l.set_cursor_pos(2).is_err());
+    /// assert!(l.set_cursor_pos(3).is_ok()); // lö|l
+    /// assert!(l.set_cursor_pos(4).is_ok()); // löl|
+    /// assert!(l.set_cursor_pos(5).is_err());
+    /// ```
+    pub fn set_cursor_pos(&mut self, pos: usize) -> Result<(), ()> {
+        if let Some(grapheme_index) = self
+            .text
+            .grapheme_indices(true)
+            .enumerate()
+            .find(|(_, (byte_index, _))| *byte_index == pos)
+            .map(|(grapheme_index, _)| grapheme_index)
+            .or_else(|| {
+                if pos == self.text.len() {
+                    Some(count_grapheme_clusters(&self.text))
+                } else {
+                    None
+                }
+            })
+        {
+            self.cursor_pos = grapheme_index;
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
     /// Erase the grapheme cluster at the specified (grapheme cluster) position.
     fn erase_symbol_at(&mut self, pos: usize) -> Result<(), ()> {
         if pos < count_grapheme_clusters(&self.text) {
