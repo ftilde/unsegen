@@ -63,17 +63,6 @@ impl LineEdit {
         self.move_cursor_to_end_of_line();
     }
 
-    /// Set (and overwrite) the current content. The cursor position (measured in grapheme clusters
-    /// from the start) will be the same, if the new text is shorter or equally long. Otherwise the
-    /// cursor will be positioned at the end of the line.
-    pub fn replace(&mut self, text: impl Into<String>) {
-        // TODO breaking change: somehow merge functionality with replace?
-        self.text = text.into();
-        if self.cursor_pos > count_grapheme_clusters(&self.text) {
-            self.move_cursor_to_end_of_line();
-        }
-    }
-
     /// Move the cursor to the end, i.e., *behind* the last grapheme cluster.
     pub fn move_cursor_to_end_of_line(&mut self) {
         self.cursor_pos = count_grapheme_clusters(&self.text) as usize;
