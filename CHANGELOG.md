@@ -3,9 +3,10 @@
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
 ## UNRELEASED
 ### Added
-- Add `LineEdit::cursor_pos` to retrieve (byte) cursor position .
-- Add `LineEdit::set_cursor_pos` to set (byte) cursor position .
-- Implement `Deref<Target=LineEdit>` for PromptLine
+- Add `LineEdit::cursor_pos` to retrieve (byte) cursor position.
+- Add `LineEdit::set_cursor_pos` to set (byte) cursor position.
+- Implement `Deref<Target=LineEdit>` for PromptLine.
+- Add `Behavior` implementation for slices of `ToEvent`s.
 ### Fixed
 - Fix erasing characters in `LineEdit`.
 

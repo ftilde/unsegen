@@ -264,6 +264,19 @@ impl<E: ToEvent, F: FnOnce()> Behavior for (E, F) {
     }
 }
 
+impl<E: ToEvent + Clone, F: FnOnce()> Behavior for (&[E], F) {
+    fn input(self, input: Input) -> Option<Input> {
+        let (it, function) = self;
+        for event in it {
+            if input.matches(event.clone()) {
+                function();
+                return None;
+            }
+        }
+        Some(input)
+    }
+}
+
 /// A common return type for Operations such as functions of `Scrollable`, `Writable`,
 /// `Navigatable`, etc.
 ///
