@@ -103,6 +103,11 @@ impl Input {
         chain_begin.chain(behavior)
     }
 
+    /// Convert `Input` to `InputChain` without processing an event. See `InputChain`.
+    pub fn into_chain<B: Behavior>(self) -> InputChain {
+        InputChain { input: Some(self) }
+    }
+
     /// Check whether this event is equal to the provided event-like argument.
     pub fn matches<T: ToEvent>(&self, e: T) -> bool {
         self.event == e.to_event()
