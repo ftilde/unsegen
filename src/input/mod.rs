@@ -104,7 +104,7 @@ impl Input {
     }
 
     /// Convert `Input` to `InputChain` without processing an event. See `InputChain`.
-    pub fn into_chain<B: Behavior>(self) -> InputChain {
+    pub fn into_chain(self) -> InputChain {
         InputChain { input: Some(self) }
     }
 
