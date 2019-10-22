@@ -7,7 +7,7 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 - Add `LineEdit::set_cursor_pos` to set (byte) cursor position.
 - Implement `Deref<Target=LineEdit>` for PromptLine.
 - Add `Behavior` implementation for slices of `ToEvent`s.
-- Add `Input::into_chain` convenience method in cases of conditional input processing.
+- Add `From<Input>` and `From<Option<Input>>` implementations to InputChain.
 ### Fixed
 - Fix erasing characters in `LineEdit`.
 

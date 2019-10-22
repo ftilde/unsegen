@@ -103,11 +103,6 @@ impl Input {
         chain_begin.chain(behavior)
     }
 
-    /// Convert `Input` to `InputChain` without processing an event. See `InputChain`.
-    pub fn into_chain(self) -> InputChain {
-        InputChain { input: Some(self) }
-    }
-
     /// Check whether this event is equal to the provided event-like argument.
     pub fn matches<T: ToEvent>(&self, e: T) -> bool {
         self.event == e.to_event()
@@ -185,6 +180,16 @@ impl InputChain {
     /// will be None, otherwise the original `Input` will be returned.
     pub fn finish(self) -> Option<Input> {
         self.input
+    }
+}
+impl From<Input> for InputChain {
+    fn from(input: Input) -> Self {
+        InputChain { input: Some(input) }
+    }
+}
+impl From<Option<Input>> for InputChain {
+    fn from(input: Option<Input>) -> Self {
+        InputChain { input }
     }
 }
 
