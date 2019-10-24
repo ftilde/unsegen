@@ -1,7 +1,8 @@
 # Changelog
 
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
-## UNRELEASED
+
+## [0.2.2] - 2019-10-24
 ### Added
 - Add `LineEdit::cursor_pos` to retrieve (byte) cursor position.
 - Add `LineEdit::set_cursor_pos` to set (byte) cursor position.
