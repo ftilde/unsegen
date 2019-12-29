@@ -222,9 +222,10 @@ pub mod test {
                 tiles.push(StyledGraphemeCluster::new(c, Style::plain()));
             }
             Ok(FakeTerminal {
-                values: WindowBuffer::from_storage(
-                    try! {::ndarray::Array2::from_shape_vec((h as usize, w as usize), tiles)},
-                ),
+                values: WindowBuffer::from_storage(::ndarray::Array2::from_shape_vec(
+                    (h as usize, w as usize),
+                    tiles,
+                )?),
             })
         }
 
@@ -261,10 +262,10 @@ pub mod test {
             for r in 0..raw_values.dim().0 {
                 for c in 0..raw_values.dim().1 {
                     let c = raw_values.get((r, c)).expect("debug: in bounds");
-                    try! {write!(f, "{}", c.grapheme_cluster.as_str())};
+                    write!(f, "{}", c.grapheme_cluster.as_str())?;
                 }
                 if r != raw_values.dim().0 - 1 {
-                    try! {write!(f, "|")};
+                    write!(f, "|")?;
                 }
             }
             Ok(())
