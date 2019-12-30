@@ -150,6 +150,11 @@ impl<R: TableRow + 'static> Table<R> {
         }
     }
 
+    /// Get access to the currently active row.
+    pub fn current_row(&self) -> Option<&R> {
+        self.rows.get(self.row_pos as usize)
+    }
+
     /// Get mutable access to the currently active row.
     pub fn current_row_mut(&mut self) -> Option<&mut R> {
         self.rows.get_mut(self.row_pos as usize)

@@ -5,6 +5,7 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 ## Unreleased
 ### Added
 - Add `Terminal::on_main_screen` for executing a function in a "normal" terminal state.
+- Add `Table::current_row` for immutably accessing the currently selected row.
 
 ## [0.2.2] - 2019-10-24
 ### Added
