@@ -62,7 +62,7 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
             size_has_changed_since_last_present: true,
             _phantom: Default::default(),
         };
-        term.setup_terminal()?;
+        term.enter_tui()?;
         Ok(term)
     }
 
@@ -77,7 +77,7 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
     /// in an event loop. Then, if in the main event loop a SIGTSTP turns up, *this* function
     /// should be called.
     pub fn handle_sigtstp(&mut self) -> io::Result<()> {
-        self.restore_terminal()?;
+        self.leave_tui()?;
 
         let mut stop_and_cont = SigSet::empty();
         stop_and_cont.add(SIGCONT);
@@ -94,31 +94,45 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
         // 3. Once we receive a SIGCONT we block SIGTSTP and SIGCONT again and resume.
         pthread_sigmask(SigmaskHow::SIG_BLOCK, Some(&stop_and_cont), None)?;
 
-        self.setup_terminal()
+        self.enter_tui()
     }
 
     /// Set up the terminal for "full screen" work (i.e., hide cursor, switch to alternate screen).
-    fn setup_terminal(&mut self) -> io::Result<()> {
+    fn enter_tui(&mut self) -> io::Result<()> {
         write!(
             self.terminal,
             "{}{}",
             termion::screen::ToAlternateScreen,
             termion::cursor::Hide
         )?;
+        self.terminal.set_raw_mode()?;
         self.terminal.flush()?;
         Ok(())
     }
 
     /// Restore terminal from "full screen" (i.e., show cursor again, switch to main screen).
-    fn restore_terminal(&mut self) -> io::Result<()> {
+    fn leave_tui(&mut self) -> io::Result<()> {
         write!(
             self.terminal,
             "{}{}",
             termion::screen::ToMainScreen,
             termion::cursor::Show
         )?;
+        self.terminal.modify_mode(|m| m)?; //Restore saved mode
         self.terminal.flush()?;
         Ok(())
+    }
+
+    /// Temporarily switch back to main terminal screen, restore terminal state, then execute `f`
+    /// and subsequently switch back to tui mode again.
+    ///
+    /// In other words: Execute a function `f` in "normal" terminal mode. This can be useful if the
+    /// application executes a subprocess that is expected to take control of the tty temporarily.
+    pub fn on_main_screen<R, F: FnOnce() -> R>(&mut self, f: F) -> io::Result<R> {
+        self.leave_tui()?;
+        let res = f();
+        self.enter_tui()?;
+        Ok(res)
     }
 
     /// Create a root window that covers the whole terminal grid.
@@ -179,7 +193,7 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
 
 impl<'a, T: Write + AsRawFd> Drop for Terminal<'a, T> {
     fn drop(&mut self) {
-        let _ = self.restore_terminal();
+        let _ = self.leave_tui();
     }
 }
 
