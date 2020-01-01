@@ -24,42 +24,71 @@ pub fn layout_linearly<T: AxisDimension + Ord + Debug + Clone>(
 
     let mut assigned_spaces =
         vec![PositiveAxisDiff::new(0).unwrap(); demands.len()].into_boxed_slice();
-    let mut unfinished = Vec::<usize>::new();
 
-    for (i, demand) in demands.iter().enumerate() {
-        let mut is_unfinished = false;
-        if let Some(max_demand) = demand.max {
-            if max_demand != demand.min {
-                is_unfinished = true;
-            }
-        } else {
-            is_unfinished = true;
-        }
-
-        let assigned_space = min(available_space, demand.min);
-        available_space = (available_space - assigned_space)
-            .try_into_positive()
-            .unwrap();
-        assigned_spaces[i] = assigned_space;
-
-        if is_unfinished {
-            unfinished.push(i);
-        }
-
-        let separator_width = if i == (demands.len() - 1) {
-            //Last element does not have a following separator
-            PositiveAxisDiff::new(0).unwrap()
-        } else {
-            separator_width
-        };
-
-        if available_space <= separator_width {
-            return assigned_spaces;
-        }
-        available_space = (available_space - separator_width)
-            .try_into_positive()
-            .unwrap();
+    // Reserve space for separators
+    let diff = available_space - separator_width * demands.len().saturating_sub(1);
+    if diff < 0 {
+        return assigned_spaces;
     }
+    available_space = diff.try_into_positive().unwrap();
+
+    // All are unfinished initially
+    let mut unfulfilled_min = (0..demands.len()).into_iter().collect::<Vec<usize>>();
+
+    // Try to fullfil all min demands fairly
+    while !unfulfilled_min.is_empty() {
+        let num_unfulfilled = unfulfilled_min.len();
+        if available_space == 0 {
+            break;
+        }
+        let equal_budget = available_space / num_unfulfilled;
+        let mut left_over = available_space % num_unfulfilled;
+
+        let mut still_unfullfilled = Vec::<usize>::new();
+        for num_unfulfilled_index in unfulfilled_min {
+            let demand = demands[num_unfulfilled_index];
+            let assigned_space = &mut assigned_spaces[num_unfulfilled_index];
+
+            let budget = if equal_budget > 0 {
+                equal_budget
+            } else {
+                if left_over > 0 {
+                    left_over = (left_over - 1).try_into_positive().unwrap();
+                    PositiveAxisDiff::new(1).unwrap()
+                } else {
+                    PositiveAxisDiff::new(0).unwrap()
+                }
+            };
+
+            let required_to_min = (demand.min - *assigned_space).positive_or_zero();
+            let additional_space = min(budget, required_to_min);
+            available_space = (available_space - additional_space)
+                .try_into_positive()
+                .unwrap();
+            *assigned_space += additional_space;
+
+            if *assigned_space < demand.min {
+                still_unfullfilled.push(num_unfulfilled_index);
+            }
+        }
+        unfulfilled_min = still_unfullfilled;
+    }
+
+    // Collect not completely fulfilled rewards
+    let mut unfinished = (0..demands.len())
+        .into_iter()
+        .filter(|i| {
+            let demand = demands[*i];
+            if let Some(max_demand) = demand.max {
+                if demand.min != max_demand {
+                    return true;
+                }
+            } else {
+                return true;
+            }
+            false
+        })
+        .collect::<Vec<usize>>();
 
     // equalize remaining
     loop {
@@ -397,8 +426,13 @@ mod test {
         );
         assert_eq_boxed_slices(
             layout_linearly(w(4), w(0), &[Demand::exact(5), Demand::exact(3)]),
-            Box::new([4, 0]),
-            "none for 2nd",
+            Box::new([2, 2]),
+            "not enough for min",
+        );
+        assert_eq_boxed_slices(
+            layout_linearly(w(5), w(0), &[Demand::exact(5), Demand::exact(3)]),
+            Box::new([3, 2]),
+            "not enough for min unequal",
         );
     }
 
@@ -416,8 +450,8 @@ mod test {
         );
         assert_eq_boxed_slices(
             layout_linearly(w(4), w(0), &[Demand::from_to(5, 6), Demand::from_to(1, 4)]),
-            Box::new([4, 0]),
-            "nothing for 2nd",
+            Box::new([3, 1]),
+            "not enough for min of first",
         );
         assert_eq_boxed_slices(
             layout_linearly(w(4), w(0), &[Demand::from_to(1, 5), Demand::from_to(1, 4)]),
@@ -445,8 +479,13 @@ mod test {
         );
         assert_eq_boxed_slices(
             layout_linearly(w(4), w(0), &[Demand::at_least(5), Demand::at_least(2)]),
-            Box::new([4, 0]),
-            "none for 2nd",
+            Box::new([2, 2]),
+            "not enough for min",
+        );
+        assert_eq_boxed_slices(
+            layout_linearly(w(5), w(0), &[Demand::at_least(5), Demand::at_least(2)]),
+            Box::new([3, 2]),
+            "not enough for min unequal",
         );
     }
 
@@ -482,7 +521,7 @@ mod test {
                 w(0),
                 &[Demand::from_to(5, 6), Demand::exact(5), Demand::at_least(5)],
             ),
-            Box::new([5, 5, 0]),
+            Box::new([4, 3, 3]),
             "misc 2",
         );
         assert_eq_boxed_slices(
@@ -491,7 +530,7 @@ mod test {
                 w(0),
                 &[Demand::from_to(4, 6), Demand::exact(4), Demand::at_least(3)],
             ),
-            Box::new([4, 4, 2]),
+            Box::new([4, 3, 3]),
             "misc 3",
         );
         assert_eq_boxed_slices(
@@ -558,9 +597,22 @@ mod test {
             Box::new([30, 51]),
             "misc 10",
         );
+
+        assert_eq_boxed_slices(
+            layout_linearly(
+                w(10),
+                w(0),
+                &[Demand::from_to(6, 6), Demand::exact(4), Demand::at_least(2)],
+            ),
+            Box::new([4, 4, 2]),
+            "misc 11",
+        );
     }
 
-    fn aeq_horizontal_layout_space_demand(widgets: Vec<&dyn Widget>, solution: (ColDemand, RowDemand)) {
+    fn aeq_horizontal_layout_space_demand(
+        widgets: Vec<&dyn Widget>,
+        solution: (ColDemand, RowDemand),
+    ) {
         let demand2d = Demand2D {
             width: solution.0,
             height: solution.1,
@@ -647,7 +699,10 @@ mod test {
         );
     }
 
-    fn aeq_vertical_layout_space_demand(widgets: Vec<&dyn Widget>, solution: (ColDemand, RowDemand)) {
+    fn aeq_vertical_layout_space_demand(
+        widgets: Vec<&dyn Widget>,
+        solution: (ColDemand, RowDemand),
+    ) {
         let demand2d = Demand2D {
             width: solution.0,
             height: solution.1,
@@ -681,7 +736,11 @@ mod test {
             (Demand::at_least(5), Demand::at_least(4)),
         );
     }
-    fn aeq_vertical_layout_draw(terminal_size: (u32, u32), widgets: Vec<&dyn Widget>, solution: &str) {
+    fn aeq_vertical_layout_draw(
+        terminal_size: (u32, u32),
+        widgets: Vec<&dyn Widget>,
+        solution: &str,
+    ) {
         let mut term = FakeTerminal::with_size(terminal_size);
         let widgets_with_hints: Vec<(&dyn Widget, RenderingHints)> = widgets
             .into_iter()
@@ -752,7 +811,15 @@ mod test {
 
             let space = rng.gen_range(0, max_space);
             let separator_size = rng.gen_range(0, max_separator_size);
-            layout_linearly(w(space), w(separator_size), demands.as_slice());
+            let layout = layout_linearly(w(space), w(separator_size), demands.as_slice());
+
+            let separator_space = (demands.len() as i32 - 1) * separator_size;
+
+            let assigned: i32 = layout.iter().map(|l| l.raw_value()).sum();
+
+            if assigned > 0 {
+                assert!(space >= assigned + separator_space);
+            }
         }
     }
 }
