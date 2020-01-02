@@ -2,7 +2,7 @@
 
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
 
-## Unreleased
+## [0.2.2] - 2020-01-02
 ### Added
 - Add `Terminal::on_main_screen` for executing a function in a "normal" terminal state.
 - Add `Table::current_row` for immutably accessing the currently selected row.
