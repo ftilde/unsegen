@@ -1,6 +1,6 @@
 [package]
 name = "unsegen"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["ftilde <ftilde@protonmail.com>"]
 
 description = "Another tui library"
