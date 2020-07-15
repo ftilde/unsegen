@@ -24,26 +24,18 @@ impl TextFormat {
     fn set_terminal_attributes<W: Write>(self, terminal: &mut W) {
         if self.bold {
             write!(terminal, "{}", termion::style::Bold).expect("set bold style");
-        } else {
-            write!(terminal, "{}", termion::style::NoBold).expect("set no bold style");
         }
 
         if self.italic {
             write!(terminal, "{}", termion::style::Italic).expect("set italic style");
-        } else {
-            write!(terminal, "{}", termion::style::NoItalic).expect("set no italic style");
         }
 
         if self.invert {
             write!(terminal, "{}", termion::style::Invert).expect("set invert style");
-        } else {
-            write!(terminal, "{}", termion::style::NoInvert).expect("set no invert style");
         }
 
         if self.underline {
             write!(terminal, "{}", termion::style::Underline).expect("set underline style");
-        } else {
-            write!(terminal, "{}", termion::style::NoUnderline).expect("set no underline style");
         }
     }
 }
@@ -325,7 +317,7 @@ impl Color {
     fn set_terminal_attributes_fg<W: Write>(self, terminal: &mut W) -> ::std::io::Result<()> {
         use termion::color::Fg as Target;
         match self {
-            Color::Default => write!(terminal, "{}", Target(termion::color::Reset)),
+            Color::Default => Ok(()),
             Color::Rgb { r, g, b } => write!(terminal, "{}", Target(termion::color::Rgb(r, g, b))),
             Color::Ansi(v) => write!(terminal, "{}", Target(termion::color::AnsiValue(v))),
             Color::Black => write!(terminal, "{}", Target(termion::color::Black)),
@@ -351,7 +343,7 @@ impl Color {
     fn set_terminal_attributes_bg<W: Write>(self, terminal: &mut W) -> ::std::io::Result<()> {
         use termion::color::Bg as Target;
         match self {
-            Color::Default => write!(terminal, "{}", Target(termion::color::Reset)),
+            Color::Default => Ok(()),
             Color::Rgb { r, g, b } => write!(terminal, "{}", Target(termion::color::Rgb(r, g, b))),
             Color::Ansi(v) => write!(terminal, "{}", Target(termion::color::AnsiValue(v))),
             Color::Black => write!(terminal, "{}", Target(termion::color::Black)),
@@ -392,6 +384,18 @@ impl Style {
 
     /// Set the attributes of the given ANSI terminal to match the current Style.
     pub(crate) fn set_terminal_attributes<W: Write>(self, terminal: &mut W) {
+        // Since we cannot rely on NoBold reseting the bold style (see
+        // https://en.wikipedia.org/wiki/Talk:ANSI_escape_code#SGR_21%E2%80%94%60Bold_off%60_not_widely_supported)
+        // we first reset _all_ styles, then reapply anything that differs from the default.
+        write!(
+            terminal,
+            "{}{}{}",
+            termion::style::Reset,
+            termion::color::Fg(termion::color::Reset),
+            termion::color::Bg(termion::color::Reset)
+        )
+        .expect("reset style");
+
         self.fg_color
             .set_terminal_attributes_fg(terminal)
             .expect("write fg_color");
