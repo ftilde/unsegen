@@ -32,7 +32,7 @@ use std::io::{StdoutLock, Write};
 use std::os::unix::io::AsRawFd;
 use termion;
 
-use nix::sys::signal::{kill, pthread_sigmask, SigSet, SigmaskHow, SIGCONT, SIGTSTP};
+use nix::sys::signal::{killpg, pthread_sigmask, SigSet, SigmaskHow, SIGCONT, SIGTSTP};
 use nix::unistd::getpgrp;
 
 /// A type providing an interface to the underlying physical terminal.
@@ -87,7 +87,7 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
         pthread_sigmask(SigmaskHow::SIG_UNBLOCK, Some(&stop_and_cont), None)?;
 
         // 2. Reissue SIGTSTP (this time to whole the process group!)...
-        kill(-getpgrp(), SIGTSTP)?;
+        killpg(getpgrp(), SIGTSTP)?;
         // ... and stop!
         // Now we are waiting for a SIGCONT.
 
