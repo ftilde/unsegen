@@ -84,15 +84,17 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
         stop_and_cont.add(SIGTSTP);
 
         // 1. Unblock SIGTSTP and SIGCONT, so that we actually stop when we receive another SIGTSTP
-        pthread_sigmask(SigmaskHow::SIG_UNBLOCK, Some(&stop_and_cont), None)?;
+        pthread_sigmask(SigmaskHow::SIG_UNBLOCK, Some(&stop_and_cont), None)
+            .map_err(|e| e.as_errno().expect("Only expecting io errors"))?;
 
         // 2. Reissue SIGTSTP (this time to whole the process group!)...
-        killpg(getpgrp(), SIGTSTP)?;
+        killpg(getpgrp(), SIGTSTP).map_err(|e| e.as_errno().expect("Only expecting io errors"))?;
         // ... and stop!
         // Now we are waiting for a SIGCONT.
 
         // 3. Once we receive a SIGCONT we block SIGTSTP and SIGCONT again and resume.
-        pthread_sigmask(SigmaskHow::SIG_BLOCK, Some(&stop_and_cont), None)?;
+        pthread_sigmask(SigmaskHow::SIG_BLOCK, Some(&stop_and_cont), None)
+            .map_err(|e| e.as_errno().expect("Only expecting io errors"))?;
 
         self.enter_tui()
     }
