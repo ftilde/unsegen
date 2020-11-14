@@ -2,6 +2,12 @@
 
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
 
+## UNRELEASED
+### Fixed
+- Fix build for ppc targets (thanks to ericonr).
+### Added
+- Implement `Scrollable` for `Table`.
+
 ## [0.2.4] - 2020-07-15
 ### Fixed
 - Bold style not reseting on some terminals.

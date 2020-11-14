@@ -3,6 +3,7 @@
 //! Use by implementing `TableRow` and adding instances of that type to a `Table` using `rows_mut`.
 use base::basic_types::*;
 use base::{StyleModifier, Window};
+use input::Scrollable;
 use input::{Behavior, Input, Navigatable, OperationResult};
 use widget::{
     layout_linearly, ColDemand, Demand, Demand2D, RenderingHints, RowDemand, SeparatingStyle,
@@ -322,5 +323,31 @@ impl<R: TableRow + 'static> Navigatable for Table<R> {
     fn move_right(&mut self) -> OperationResult {
         self.col_pos += 1;
         self.validate_col_pos()
+    }
+}
+
+impl<R: TableRow + 'static> Scrollable for Table<R> {
+    fn scroll_backwards(&mut self) -> OperationResult {
+        self.move_up()
+    }
+    fn scroll_forwards(&mut self) -> OperationResult {
+        self.move_down()
+    }
+    fn scroll_to_beginning(&mut self) -> OperationResult {
+        if self.row_pos != 0 {
+            self.row_pos = 0;
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+    fn scroll_to_end(&mut self) -> OperationResult {
+        let end = self.rows.len().saturating_sub(1) as u32;
+        if self.row_pos != end {
+            self.row_pos = end;
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }
