@@ -2,7 +2,7 @@
 
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
 
-## UNRELEASED
+## [0.2.5] - 2020-11-14
 ### Fixed
 - Fix build for ppc targets (thanks to ericonr).
 ### Added
