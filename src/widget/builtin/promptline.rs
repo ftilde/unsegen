@@ -12,24 +12,13 @@ pub struct PromptLine {
     prompt: LineLabel,
     pub line: LineEdit,
     history: Vec<String>,
-    history_scroll_position: Option<ScrollBackState>,
+    state: State,
     layout: HorizontalLayout,
 }
 
-/// Saves the current position in the history buffer and the state of the lineedit before scrolling
-/// back through history thus enabling going back to the uncompleted line.
-struct ScrollBackState {
-    active_line: String,
-    pos: usize,
-}
-
-impl ScrollBackState {
-    fn new(active_line: String, pos: usize) -> Self {
-        ScrollBackState {
-            active_line: active_line,
-            pos: pos,
-        }
-    }
+enum State {
+    Editing,
+    Scrollback { active_line: String, pos: usize }, //invariant: pos < history.len()
 }
 
 impl PromptLine {
@@ -40,7 +29,7 @@ impl PromptLine {
             prompt: LineLabel::new(prompt),
             line: LineEdit::new(),
             history: Vec::new(),
-            history_scroll_position: None, //invariant: let Some(pos) = history_scroll_pos => pos < history.len()
+            state: State::Editing,
             layout: HorizontalLayout::new(SeparatingStyle::None),
         }
     }
@@ -77,9 +66,9 @@ impl PromptLine {
 
     /// Set the line content according to the current scrollback position
     fn sync_line_to_history_scroll_position(&mut self) {
-        if let Some(ref state) = self.history_scroll_position {
+        if let State::Scrollback { pos, .. } = self.state {
             // history[pos] is always valid because of the invariant on history_scroll_pos
-            self.line.set(&self.history[state.pos]);
+            self.line.set(&self.history[pos]);
         }
     }
 
@@ -87,7 +76,7 @@ impl PromptLine {
     /// editing a complete new line".
     fn note_edit_operation(&mut self, res: OperationResult) -> OperationResult {
         if res.is_ok() {
-            self.history_scroll_position = None;
+            self.state = State::Editing;
         }
         res
     }
@@ -107,71 +96,96 @@ impl Widget for PromptLine {
 
 impl Scrollable for PromptLine {
     fn scroll_forwards(&mut self) -> OperationResult {
-        let op_result;
-        self.history_scroll_position = if let Some(mut state) = self.history_scroll_position.take()
-        {
-            op_result = Ok(());
-            if state.pos + 1 < self.history.len() {
-                state.pos += 1;
-                Some(state)
-            } else {
-                self.line.set(&state.active_line);
-                None
+        let result;
+        let mut tmp = State::Editing;
+        std::mem::swap(&mut tmp, &mut self.state);
+        self.state = match tmp {
+            State::Editing => {
+                result = Err(());
+                State::Editing
             }
-        } else {
-            op_result = Err(());
-            None
+            State::Scrollback {
+                active_line,
+                mut pos,
+            } => {
+                result = Ok(());
+                if pos + 1 < self.history.len() {
+                    pos += 1;
+                    State::Scrollback { pos, active_line }
+                } else {
+                    self.line.set(&active_line);
+                    State::Editing
+                }
+            }
         };
         self.sync_line_to_history_scroll_position();
-        op_result
+        result
     }
     fn scroll_backwards(&mut self) -> OperationResult {
-        self.history_scroll_position = if let Some(mut state) = self.history_scroll_position.take()
-        {
-            if state.pos > 0 {
-                state.pos -= 1;
+        let result;
+        let mut tmp = State::Editing;
+        std::mem::swap(&mut tmp, &mut self.state);
+        self.state = match tmp {
+            State::Editing => {
+                if self.history.len() > 0 {
+                    result = Ok(());
+                    State::Scrollback {
+                        active_line: self.line.get().to_owned(),
+                        pos: self.history.len() - 1,
+                    }
+                } else {
+                    result = Err(());
+                    State::Editing
+                }
             }
-            Some(state)
-        } else {
-            if self.history.len() > 0 {
-                Some(ScrollBackState::new(
-                    self.line.get().to_owned(),
-                    self.history.len() - 1,
-                ))
-            } else {
-                None
+            State::Scrollback {
+                active_line,
+                mut pos,
+            } => {
+                if pos > 0 {
+                    pos -= 1;
+                    result = Ok(());
+                } else {
+                    result = Err(());
+                }
+                State::Scrollback { active_line, pos }
             }
         };
         self.sync_line_to_history_scroll_position();
-        if self.history_scroll_position.is_some() {
-            Ok(())
-        } else {
-            Err(())
-        }
+        result
     }
     fn scroll_to_beginning(&mut self) -> OperationResult {
-        self.history_scroll_position = if self.history.len() > 0 {
-            Some(ScrollBackState::new(self.line.get().to_owned(), 0))
+        let result;
+        self.state = if self.history.len() > 0 {
+            result = Ok(());
+            State::Scrollback {
+                active_line: self.line.get().to_owned(),
+                pos: 0,
+            }
         } else {
-            None
+            result = Err(());
+            State::Editing
         };
         self.sync_line_to_history_scroll_position();
-        if self.history_scroll_position.is_some() {
-            Ok(())
-        } else {
-            Err(())
-        }
+        result
     }
     fn scroll_to_end(&mut self) -> OperationResult {
-        let res = if let Some(ref state) = self.history_scroll_position {
-            self.line.set(&state.active_line);
-            Ok(())
-        } else {
-            Err(())
+        let result;
+        let mut tmp = State::Editing;
+        std::mem::swap(&mut tmp, &mut self.state);
+        self.state = match tmp {
+            State::Editing => {
+                result = Err(());
+                State::Editing
+            }
+            State::Scrollback { active_line, .. } => {
+                result = Ok(());
+                self.line.set(&active_line);
+                State::Editing
+            }
         };
-        self.history_scroll_position = None;
         self.sync_line_to_history_scroll_position();
-        res
+        result
     }
 }
 impl Navigatable for PromptLine {
