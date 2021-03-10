@@ -133,8 +133,9 @@ use widget::{ColDemand, Demand2D, RenderingHints, RowDemand, Widget};
 
 /// Extension to the widget trait to enable passing input to (active) widgets.
 /// The parameter P can be used to manipulate global application state.
-pub trait Container<P: ?Sized>: Widget {
+pub trait Container<P: ?Sized> {
     fn input(&mut self, input: Input, parameters: &mut P) -> Option<Input>;
+    fn as_widget<'a>(&'a self) -> Box<dyn Widget + 'a>;
 }
 
 /// A ContainerProvider stores the individual components (`Container`s) of an application and
@@ -367,7 +368,10 @@ impl<C: ContainerProvider> Leaf<C> {
 
 impl<C: ContainerProvider> Layout<C> for Leaf<C> {
     fn space_demand(&self, containers: &C) -> Demand2D {
-        containers.get(&self.container_index).space_demand()
+        containers
+            .get(&self.container_index)
+            .as_widget()
+            .space_demand()
     }
     fn layout(&self, available_area: Rectangle, _: &C) -> LayoutOutput<C::Index> {
         let mut output = LayoutOutput::new();
@@ -684,6 +688,7 @@ impl<'a, C: ContainerProvider> ContainerManager<'a, C> {
 
             provider
                 .get_mut(&index)
+                .as_widget()
                 .draw(window.create_subwindow(rect.x_range, rect.y_range), hints);
         }
 

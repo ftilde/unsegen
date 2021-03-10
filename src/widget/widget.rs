@@ -1,6 +1,6 @@
 //! The `Widget` abstraction and some related types.
 use base::basic_types::*;
-use base::Window;
+use base::{Cursor, Window, WrappingMode};
 use std::cmp::max;
 use std::iter::Sum;
 use std::marker::PhantomData;
@@ -23,6 +23,60 @@ pub trait Widget {
     ///
     /// The hints give the widget some useful information on how to render.
     fn draw(&self, window: Window, hints: RenderingHints);
+}
+
+//pub trait WidgetExt: Widget {
+//    fn centered(self) -> Centered<Self> {
+//        Centered(self)
+//    }
+//}
+
+pub struct Centered<W>(pub W);
+
+impl<W: Widget> Widget for Centered<W> {
+    fn space_demand(&self) -> Demand2D {
+        self.0.space_demand()
+    }
+    fn draw(&self, mut window: Window, hints: RenderingHints) {
+        let demand = self.space_demand();
+
+        let window_height = window.get_height();
+        let window_width = window.get_width();
+
+        let max_height = demand.height.max.unwrap_or(window.get_height());
+        let max_width = demand.width.max.unwrap_or(window.get_width());
+
+        let start_row = ((window_height - max_height) / 2)
+            .from_origin()
+            .positive_or_zero();
+        let start_col = ((window_width - max_width) / 2)
+            .from_origin()
+            .positive_or_zero();
+        let end_row = (start_row + max_height).min(window_height.from_origin());
+        let end_col = (start_col + max_width).min(window_width.from_origin());
+
+        let window = window.create_subwindow(start_col..end_col, start_row..end_row);
+        self.0.draw(window, hints);
+    }
+}
+
+impl<S: std::borrow::Borrow<str>> Widget for S {
+    fn space_demand(&self) -> Demand2D {
+        let mut width = 0;
+        let mut height = 0;
+        for line in self.borrow().lines() {
+            width = width.max(crate::widget::count_grapheme_clusters(line));
+            height += 1;
+        }
+        Demand2D {
+            width: Demand::exact(width),
+            height: Demand::exact(height),
+        }
+    }
+    fn draw(&self, mut window: Window, _hints: RenderingHints) {
+        let mut cursor = Cursor::new(&mut window).wrapping_mode(WrappingMode::Wrap);
+        cursor.write(self.borrow());
+    }
 }
 
 /// Hints that can be used by applications to control how Widgets are rendered and used by Widgets

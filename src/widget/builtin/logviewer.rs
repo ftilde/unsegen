@@ -45,6 +45,10 @@ impl LogViewer {
     fn view(&self, range: Range<LineIndex>) -> &[String] {
         &self.storage[range.start.raw_value()..range.end.raw_value()]
     }
+
+    pub fn as_widget<'a>(&'a self) -> impl Widget + 'a {
+        LogViewerWidget { inner: self }
+    }
 }
 
 impl fmt::Write for LogViewer {
@@ -59,39 +63,6 @@ impl fmt::Write for LogViewer {
         }
         self.active_line_mut().push_str(&s);
         Ok(())
-    }
-}
-
-impl Widget for LogViewer {
-    fn space_demand(&self) -> Demand2D {
-        Demand2D {
-            width: Demand::at_least(1),
-            height: Demand::at_least(1),
-        }
-    }
-    fn draw(&self, mut window: Window, _: RenderingHints) {
-        let height = window.get_height();
-        if height == 0 {
-            return;
-        }
-
-        // TODO: This does not work well when lines are wrapped, but we may want scrolling farther
-        // than 1 line per event
-        // self.scroll_step = ::std::cmp::max(1, height.checked_sub(1).unwrap_or(1));
-
-        let y_start = height - 1;
-        let mut cursor = Cursor::new(&mut window)
-            .position(ColIndex::new(0), y_start.from_origin())
-            .wrapping_mode(WrappingMode::Wrap);
-        let end_line = self.current_line_index();
-        let start_line =
-            LineIndex::new(end_line.raw_value().checked_sub(height.into()).unwrap_or(0));
-        for line in self.view(start_line..(end_line + 1)).iter().rev() {
-            let num_auto_wraps = cursor.num_expected_wraps(&line) as i32;
-            cursor.move_by(ColDiff::new(0), RowDiff::new(-num_auto_wraps));
-            cursor.writeln(&line);
-            cursor.move_by(ColDiff::new(0), RowDiff::new(-num_auto_wraps) - 2);
-        }
     }
 }
 
@@ -138,6 +109,43 @@ impl Scrollable for LogViewer {
         } else {
             self.scrollback_position = None;
             Ok(())
+        }
+    }
+}
+
+struct LogViewerWidget<'a> {
+    inner: &'a LogViewer,
+}
+
+impl<'a> Widget for LogViewerWidget<'a> {
+    fn space_demand(&self) -> Demand2D {
+        Demand2D {
+            width: Demand::at_least(1),
+            height: Demand::at_least(1),
+        }
+    }
+    fn draw(&self, mut window: Window, _: RenderingHints) {
+        let height = window.get_height();
+        if height == 0 {
+            return;
+        }
+
+        // TODO: This does not work well when lines are wrapped, but we may want scrolling farther
+        // than 1 line per event
+        // self.scroll_step = ::std::cmp::max(1, height.checked_sub(1).unwrap_or(1));
+
+        let y_start = height - 1;
+        let mut cursor = Cursor::new(&mut window)
+            .position(ColIndex::new(0), y_start.from_origin())
+            .wrapping_mode(WrappingMode::Wrap);
+        let end_line = self.inner.current_line_index();
+        let start_line =
+            LineIndex::new(end_line.raw_value().checked_sub(height.into()).unwrap_or(0));
+        for line in self.inner.view(start_line..(end_line + 1)).iter().rev() {
+            let num_auto_wraps = cursor.num_expected_wraps(&line) as i32;
+            cursor.move_by(ColDiff::new(0), RowDiff::new(-num_auto_wraps));
+            cursor.writeln(&line);
+            cursor.move_by(ColDiff::new(0), RowDiff::new(-num_auto_wraps) - 2);
         }
     }
 }

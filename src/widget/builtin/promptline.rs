@@ -1,7 +1,6 @@
 //! A widget implementing "readline"-like functionality.
-use super::super::{Demand2D, HorizontalLayout, RenderingHints, SeparatingStyle, Widget};
-use super::{LineEdit, LineLabel};
-use base::Window;
+use super::super::{HLayout, Widget};
+use super::LineEdit;
 use input::{Editable, Navigatable, OperationResult, Scrollable, Writable};
 use std::ops::{Deref, DerefMut};
 
@@ -9,14 +8,12 @@ use std::ops::{Deref, DerefMut};
 ///
 /// Basically a more sophisticated version of `LineEdit` with history.
 pub struct PromptLine {
-    prompt: LineLabel,
     edit_prompt: String,
     scroll_prompt: String,
     search_prompt: String,
     pub line: LineEdit,
     history: Vec<String>,
     state: State,
-    layout: HorizontalLayout,
 }
 
 enum State {
@@ -71,11 +68,9 @@ impl PromptLine {
             edit_prompt: prompt.clone(),
             scroll_prompt: prompt.clone(),
             search_prompt: prompt.clone(),
-            prompt: LineLabel::new(prompt),
             line: LineEdit::new(),
             history: Vec::new(),
             state: State::Editing,
-            layout: HorizontalLayout::new(SeparatingStyle::None),
         }
     }
 
@@ -154,20 +149,11 @@ impl PromptLine {
     /// Set the line content according to the current scrollback position
     fn update_display(&mut self) {
         match &mut self.state {
-            State::Editing => {
-                self.prompt.set(self.edit_prompt.clone());
-            }
+            State::Editing => {}
             State::Scrollback { pos, .. } => {
-                self.prompt.set(self.scroll_prompt.clone());
                 self.line.set(&self.history[*pos]);
             }
-            State::Searching {
-                pos,
-                search_pattern,
-                ..
-            } => {
-                self.prompt
-                    .set(format!("{}\"{}\": ", self.search_prompt, search_pattern));
+            State::Searching { pos, .. } => {
                 if let Some(p) = pos {
                     self.line.set(&self.history[*p]);
                 } else {
@@ -194,17 +180,16 @@ impl PromptLine {
             false
         }
     }
-}
 
-impl Widget for PromptLine {
-    fn space_demand(&self) -> Demand2D {
-        let widgets: Vec<&dyn Widget> = vec![&self.prompt, &self.line];
-        self.layout.space_demand(widgets.as_slice())
-    }
-    fn draw(&self, window: Window, hints: RenderingHints) {
-        let widgets: Vec<(&dyn Widget, RenderingHints)> =
-            vec![(&self.prompt, hints), (&self.line, hints)];
-        self.layout.draw(window, widgets.as_slice());
+    pub fn as_widget<'a>(&'a self) -> impl Widget + 'a {
+        let prompt = match &self.state {
+            State::Editing => self.edit_prompt.clone(),
+            State::Scrollback { .. } => self.scroll_prompt.clone(),
+            State::Searching { search_pattern, .. } => {
+                format!("{}\"{}\": ", self.search_prompt, search_pattern)
+            }
+        };
+        HLayout::new().widget(prompt).widget(self.line.as_widget())
     }
 }
 

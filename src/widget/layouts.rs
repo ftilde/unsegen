@@ -190,15 +190,12 @@ fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
     D: Fn(Demand2D) -> Demand<T>,
 {
     let separator_length = separator_length(separating_style);
-    let horizontal_demands: Vec<Demand<T>> = widgets
+    let demands: Vec<Demand<T>> = widgets
         .iter()
         .map(|&(ref w, _)| demand_dimension(w.space_demand()))
-        .collect(); //TODO: rename
-    let assigned_spaces = layout_linearly(
-        window_length(&window),
-        separator_length,
-        horizontal_demands.as_slice(),
-    );
+        .collect();
+    let assigned_spaces =
+        layout_linearly(window_length(&window), separator_length, demands.as_slice());
 
     debug_assert!(
         widgets.len() == assigned_spaces.len(),
@@ -229,27 +226,44 @@ fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
     }
 }
 
-/// A Layout that can be used to draw widgets horizontally, side by side on a window.
-pub struct HorizontalLayout {
+pub struct HLayout<'a> {
     separating_style: SeparatingStyle,
+    widgets: Vec<Box<dyn Widget + 'a>>,
 }
 
-impl HorizontalLayout {
-    pub fn new(separating_style: SeparatingStyle) -> Self {
-        HorizontalLayout {
-            separating_style: separating_style,
+impl<'a> HLayout<'a> {
+    pub fn new() -> Self {
+        HLayout {
+            separating_style: SeparatingStyle::None,
+            widgets: Vec::new(),
         }
     }
 
-    /// Return the current demand for (rectangular) screen estate.
-    ///
-    /// Similar to Widget::space_demand, but with a different signature, as the layout does not own
-    /// the widgets.
-    pub fn space_demand(&self, widgets: &[&dyn Widget]) -> Demand2D {
+    pub fn separator(self, separator: GraphemeCluster) -> Self {
+        self.separating_style(SeparatingStyle::Draw(separator))
+    }
+
+    pub fn alterating(self, style_modifier: StyleModifier) -> Self {
+        self.separating_style(SeparatingStyle::AlternatingStyle(style_modifier))
+    }
+
+    pub fn separating_style(mut self, style: SeparatingStyle) -> Self {
+        self.separating_style = style;
+        self
+    }
+
+    pub fn widget<W: Widget + 'a>(mut self, t: W) -> Self {
+        self.widgets.push(Box::new(t));
+        self
+    }
+}
+
+impl<'a> Widget for HLayout<'a> {
+    fn space_demand(&self) -> Demand2D {
         let mut total_x = ColDemand::exact(0);
         let mut total_y = RowDemand::exact(0);
         let mut n_elements = 0;
-        for w in widgets {
+        for w in self.widgets.iter() {
             let demand2d = w.space_demand();
             total_x = total_x + demand2d.width;
             total_y = total_y.max(demand2d.height);
@@ -263,12 +277,15 @@ impl HorizontalLayout {
             height: total_y,
         }
     }
-
-    /// Draw the given widgets to the window, side by side, from left to right.
-    pub fn draw(&self, window: Window, widgets: &[(&dyn Widget, RenderingHints)]) {
+    fn draw(&self, window: Window, hints: RenderingHints) {
+        let widgets = self
+            .widgets
+            .iter()
+            .map(|w| (&**w, hints))
+            .collect::<Vec<_>>();
         draw_linearly(
             window,
-            widgets,
+            &widgets[..],
             &self.separating_style,
             |w, p| w.split(p).expect("valid split pos"),
             |w| w.get_width(),
@@ -278,27 +295,44 @@ impl HorizontalLayout {
     }
 }
 
-/// A Layout that can be used to draw widgets vertically, one ontop the other, on a window.
-pub struct VerticalLayout {
+pub struct VLayout<'a> {
     separating_style: SeparatingStyle,
+    widgets: Vec<Box<dyn Widget + 'a>>,
 }
 
-impl VerticalLayout {
-    pub fn new(separating_style: SeparatingStyle) -> Self {
-        VerticalLayout {
-            separating_style: separating_style,
+impl<'a> VLayout<'a> {
+    pub fn new() -> Self {
+        VLayout {
+            separating_style: SeparatingStyle::None,
+            widgets: Vec::new(),
         }
     }
 
-    /// Return the current demand for (rectangular) screen estate.
-    ///
-    /// Similar to Widget::space_demand, but with a different signature, as the layout does not own
-    /// the widgets.
-    pub fn space_demand(&self, widgets: &[&dyn Widget]) -> Demand2D {
+    pub fn separator(self, separator: GraphemeCluster) -> Self {
+        self.separating_style(SeparatingStyle::Draw(separator))
+    }
+
+    pub fn alterating(self, style_modifier: StyleModifier) -> Self {
+        self.separating_style(SeparatingStyle::AlternatingStyle(style_modifier))
+    }
+
+    pub fn separating_style(mut self, style: SeparatingStyle) -> Self {
+        self.separating_style = style;
+        self
+    }
+
+    pub fn widget<W: Widget + 'a>(mut self, t: W) -> Self {
+        self.widgets.push(Box::new(t));
+        self
+    }
+}
+
+impl<'a> Widget for VLayout<'a> {
+    fn space_demand(&self) -> Demand2D {
         let mut total_x = Demand::exact(0);
         let mut total_y = Demand::exact(0);
         let mut n_elements = 0;
-        for w in widgets.iter() {
+        for w in self.widgets.iter() {
             let demand2d = w.space_demand();
             total_x = total_x.max(demand2d.width);
             total_y = total_y + demand2d.height;
@@ -314,10 +348,15 @@ impl VerticalLayout {
     }
 
     /// Draw the given widgets to the window, from top to bottom.
-    pub fn draw(&self, window: Window, widgets: &[(&dyn Widget, RenderingHints)]) {
+    fn draw(&self, window: Window, hints: RenderingHints) {
+        let widgets = self
+            .widgets
+            .iter()
+            .map(|w| (&**w, hints))
+            .collect::<Vec<_>>();
         draw_linearly(
             window,
-            widgets,
+            &widgets[..],
             &self.separating_style,
             |w, p| w.split(p).expect("valid split pos"),
             |w| w.get_height(),

@@ -14,40 +14,14 @@ use widget::{
 pub struct LineEdit {
     text: String,
     cursor_pos: usize,
-    cursor_style_active_blink_on: StyleModifier,
-    cursor_style_active_blink_off: StyleModifier,
-    cursor_style_inactive: StyleModifier,
 }
 
 impl LineEdit {
-    /// Create with default cursor style: Underline position when inactive and invert on blink.
+    /// Create empty LineEdit
     pub fn new() -> Self {
-        Self::with_cursor_styles(
-            StyleModifier::new().invert(BoolModifyMode::Toggle),
-            StyleModifier::new(),
-            StyleModifier::new().underline(true),
-        )
-    }
-
-    /// Create with the specified style for the cursor.
-    ///
-    /// Three styles have to be specified for the three possible states (in terms of rendering) of
-    /// the cursor:
-    ///
-    /// 1. Active, and during an "on"-blink cycle.
-    /// 2. Active, and during an "off"-blink cycle.
-    /// 3. Inactive.
-    pub fn with_cursor_styles(
-        active_blink_on: StyleModifier,
-        active_blink_off: StyleModifier,
-        inactive: StyleModifier,
-    ) -> Self {
         LineEdit {
             text: String::new(),
             cursor_pos: 0,
-            cursor_style_active_blink_on: active_blink_on,
-            cursor_style_active_blink_off: active_blink_off,
-            cursor_style_inactive: inactive,
         }
     }
 
@@ -170,64 +144,13 @@ impl LineEdit {
             Err(())
         }
     }
-}
 
-impl Widget for LineEdit {
-    fn space_demand(&self) -> Demand2D {
-        Demand2D {
-            width: Demand::at_least(text_width(&self.text) + 1),
-            height: Demand::exact(1), //TODO this is not really universal
-        }
-    }
-    fn draw(&self, mut window: Window, hints: RenderingHints) {
-        let (maybe_cursor_pos_offset, maybe_after_cursor_offset) = {
-            let mut grapheme_indices = self.text.grapheme_indices(true);
-            let cursor_cluster = grapheme_indices.nth(self.cursor_pos as usize);
-            let next_cluster = grapheme_indices.next();
-            (
-                cursor_cluster.map(|c: (usize, &str)| c.0),
-                next_cluster.map(|c: (usize, &str)| c.0),
-            )
-        };
-        let right_padding = 1;
-        let text_width_before_cursor =
-            text_width(&self.text[0..maybe_after_cursor_offset.unwrap_or(self.text.len())]);
-        let draw_cursor_start_pos = ::std::cmp::min(
-            ColIndex::new(0),
-            (window.get_width() - text_width_before_cursor - right_padding).from_origin(),
-        );
-
-        let cursor_style = match (hints.active, hints.blink) {
-            (true, Blink::On) => self.cursor_style_active_blink_on,
-            (true, Blink::Off) => self.cursor_style_active_blink_off,
-            (false, _) => self.cursor_style_inactive,
-        };
-
-        let mut cursor = Cursor::new(&mut window).position(draw_cursor_start_pos, RowIndex::new(0));
-        if let Some(cursor_pos_offset) = maybe_cursor_pos_offset {
-            let (until_cursor, from_cursor) = self.text.split_at(cursor_pos_offset);
-            cursor.write(until_cursor);
-            if let Some(after_cursor_offset) = maybe_after_cursor_offset {
-                let (cursor_str, after_cursor) =
-                    from_cursor.split_at(after_cursor_offset - cursor_pos_offset);
-                {
-                    let mut cursor = cursor.save().style_modifier();
-                    cursor.apply_style_modifier(cursor_style);
-                    cursor.write(cursor_str);
-                }
-                cursor.write(after_cursor);
-            } else {
-                let mut cursor = cursor.save().style_modifier();
-                cursor.apply_style_modifier(cursor_style);
-                cursor.write(from_cursor);
-            }
-        } else {
-            cursor.write(&self.text);
-            {
-                let mut cursor = cursor.save().style_modifier();
-                cursor.apply_style_modifier(cursor_style);
-                cursor.write(" ");
-            }
+    pub fn as_widget<'a>(&'a self) -> LineEditWidget<'a> {
+        LineEditWidget {
+            lineedit: self,
+            cursor_style_active_blink_on: StyleModifier::new().invert(BoolModifyMode::Toggle),
+            cursor_style_active_blink_off: StyleModifier::new(),
+            cursor_style_inactive: StyleModifier::new().underline(true),
         }
     }
 }
@@ -291,6 +214,91 @@ impl Editable for LineEdit {
             self.text.clear();
             self.cursor_pos = 0;
             Ok(())
+        }
+    }
+}
+
+pub struct LineEditWidget<'a> {
+    lineedit: &'a LineEdit,
+    cursor_style_active_blink_on: StyleModifier,
+    cursor_style_active_blink_off: StyleModifier,
+    cursor_style_inactive: StyleModifier,
+}
+
+impl<'a> LineEditWidget<'a> {
+    pub fn cursor_blink_on(mut self, style: StyleModifier) -> Self {
+        self.cursor_style_active_blink_on = style;
+        self
+    }
+
+    pub fn cursor_blink_off(mut self, style: StyleModifier) -> Self {
+        self.cursor_style_active_blink_off = style;
+        self
+    }
+
+    pub fn cursor_inactive(mut self, style: StyleModifier) -> Self {
+        self.cursor_style_inactive = style;
+        self
+    }
+}
+
+impl<'a> Widget for LineEditWidget<'a> {
+    fn space_demand(&self) -> Demand2D {
+        Demand2D {
+            width: Demand::at_least(text_width(&self.lineedit.text) + 1),
+            height: Demand::exact(1),
+        }
+    }
+    fn draw(&self, mut window: Window, hints: RenderingHints) {
+        let (maybe_cursor_pos_offset, maybe_after_cursor_offset) = {
+            let mut grapheme_indices = self.lineedit.text.grapheme_indices(true);
+            let cursor_cluster = grapheme_indices.nth(self.lineedit.cursor_pos as usize);
+            let next_cluster = grapheme_indices.next();
+            (
+                cursor_cluster.map(|c: (usize, &str)| c.0),
+                next_cluster.map(|c: (usize, &str)| c.0),
+            )
+        };
+        let right_padding = 1;
+        let text_width_before_cursor = text_width(
+            &self.lineedit.text[0..maybe_after_cursor_offset.unwrap_or(self.lineedit.text.len())],
+        );
+        let draw_cursor_start_pos = ::std::cmp::min(
+            ColIndex::new(0),
+            (window.get_width() - text_width_before_cursor - right_padding).from_origin(),
+        );
+
+        let cursor_style = match (hints.active, hints.blink) {
+            (true, Blink::On) => self.cursor_style_active_blink_on,
+            (true, Blink::Off) => self.cursor_style_active_blink_off,
+            (false, _) => self.cursor_style_inactive,
+        };
+
+        let mut cursor = Cursor::new(&mut window).position(draw_cursor_start_pos, RowIndex::new(0));
+        if let Some(cursor_pos_offset) = maybe_cursor_pos_offset {
+            let (until_cursor, from_cursor) = self.lineedit.text.split_at(cursor_pos_offset);
+            cursor.write(until_cursor);
+            if let Some(after_cursor_offset) = maybe_after_cursor_offset {
+                let (cursor_str, after_cursor) =
+                    from_cursor.split_at(after_cursor_offset - cursor_pos_offset);
+                {
+                    let mut cursor = cursor.save().style_modifier();
+                    cursor.apply_style_modifier(cursor_style);
+                    cursor.write(cursor_str);
+                }
+                cursor.write(after_cursor);
+            } else {
+                let mut cursor = cursor.save().style_modifier();
+                cursor.apply_style_modifier(cursor_style);
+                cursor.write(from_cursor);
+            }
+        } else {
+            cursor.write(&self.lineedit.text);
+            {
+                let mut cursor = cursor.save().style_modifier();
+                cursor.apply_style_modifier(cursor_style);
+                cursor.write(" ");
+            }
         }
     }
 }
