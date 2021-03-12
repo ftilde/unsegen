@@ -2,6 +2,15 @@
 
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
 
+## [0.3.0] - UNRELEASED
+### Added
+- Implement `Widget` for strings (for `Borrow<str>`).
+- Add `Centered` widget wrapper, which centers a widget with a smaller max size than the window.
+- Implement `PromptLine` search functionality.
+### Changed
+- Change `Widget` semantics to be short-lived.
+- Replace `{Horizontal,Vertical}Layout` with `{H,V}Layout` which are short-lived and implement Widget. [BC]
+
 ## [0.2.5] - 2020-11-14
 ### Fixed
 - Fix build for ppc targets (thanks to ericonr).
