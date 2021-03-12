@@ -373,3 +373,66 @@ impl<R: TableRow + 'static> Scrollable for Table<R> {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use base::test::FakeTerminal;
+    use base::StyleModifier;
+
+    struct TestRow(String);
+    impl TableRow for TestRow {
+        const COLUMNS: &'static [Column<Self>] = &[Column {
+            access: |r| Box::new(r.0.as_str()),
+            behavior: |_, _| None,
+        }];
+    }
+
+    fn test_table(num_rows: usize) -> Table<TestRow> {
+        let mut table = Table::new();
+        {
+            let mut rows = table.rows_mut();
+            for i in 0..num_rows {
+                rows.push(TestRow(i.to_string()));
+            }
+        }
+        table
+    }
+
+    fn aeq_table_draw(terminal_size: (u32, u32), solution: &str, table: &Table<TestRow>) {
+        let mut term = FakeTerminal::with_size(terminal_size);
+        table
+            .as_widget()
+            .focused(StyleModifier::new().bold(true))
+            .draw(term.create_root_window(), RenderingHints::default());
+        assert_eq!(
+            term,
+            FakeTerminal::from_str(terminal_size, solution).expect("term from str")
+        );
+    }
+
+    #[test]
+    fn smaller_than_terminal() {
+        aeq_table_draw((1, 3), "*0* 1 2", &test_table(10));
+        //aeq_table_draw((1, 3), "0 1 ↓", &test_table(10));
+    }
+
+    #[test]
+    fn scroll_down() {
+        let mut table = test_table(6);
+        let size = (1, 4);
+        aeq_table_draw(size, "*0* 1 2 3", &table);
+        //aeq_table_draw((4, 1), "0 1 2 ↓", &test_table(10));
+        table.move_down().unwrap();
+        aeq_table_draw(size, "0 *1* 2 3", &table);
+        table.move_down().unwrap();
+        aeq_table_draw(size, "0 1 *2* 3", &table);
+        table.move_down().unwrap();
+        aeq_table_draw(size, "0 1 2 *3*", &table);
+        table.move_down().unwrap();
+        aeq_table_draw(size, "0 1 2 3", &table);
+        table.move_down().unwrap();
+        aeq_table_draw(size, "0 1 2 3", &table);
+        assert!(table.move_down().is_err());
+    }
+}

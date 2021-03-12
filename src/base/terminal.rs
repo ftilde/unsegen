@@ -201,7 +201,8 @@ impl<'a, T: Write + AsRawFd> Drop for Terminal<'a, T> {
 
 pub mod test {
     use super::super::{
-        GraphemeCluster, Height, Style, StyledGraphemeCluster, Width, Window, WindowBuffer,
+        GraphemeCluster, Height, Style, StyleModifier, StyledGraphemeCluster, Width, Window,
+        WindowBuffer,
     };
 
     /// A fake terminal that can be used in tests to create windows and compare the resulting
@@ -226,16 +227,26 @@ pub mod test {
         /// "1 1 2 2 3 3 4 4"
         ///
         /// Spaces and newlines are ignored and the string is coerced into the specified size.
+        ///
+        /// The following characters have a special meaning:
+        /// * - toggle bold style
         pub fn from_str(
             (w, h): (u32, u32),
             description: &str,
         ) -> Result<Self, ::ndarray::ShapeError> {
             let mut tiles = Vec::<StyledGraphemeCluster>::new();
+            let mut style = Style::plain();
             for c in GraphemeCluster::all_from_str(description) {
+                if c.as_str() == "*" {
+                    style = StyleModifier::new()
+                        .bold(crate::base::BoolModifyMode::Toggle)
+                        .apply(style);
+                    continue;
+                }
                 if c.as_str() == " " || c.as_str() == "\n" {
                     continue;
                 }
-                tiles.push(StyledGraphemeCluster::new(c, Style::plain()));
+                tiles.push(StyledGraphemeCluster::new(c, style));
             }
             Ok(FakeTerminal {
                 values: WindowBuffer::from_storage(::ndarray::Array2::from_shape_vec(
@@ -278,7 +289,11 @@ pub mod test {
             for r in 0..raw_values.dim().0 {
                 for c in 0..raw_values.dim().1 {
                     let c = raw_values.get((r, c)).expect("debug: in bounds");
-                    write!(f, "{}", c.grapheme_cluster.as_str())?;
+                    if c.style.format().bold {
+                        write!(f, "*{}*", c.grapheme_cluster.as_str())?;
+                    } else {
+                        write!(f, "{}", c.grapheme_cluster.as_str())?;
+                    }
                 }
                 if r != raw_values.dim().0 - 1 {
                     write!(f, "|")?;

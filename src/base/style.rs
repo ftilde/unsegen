@@ -382,6 +382,11 @@ impl Style {
         Self::default()
     }
 
+    /// Access the `TextFormat` of the style
+    pub fn format(&self) -> TextFormat {
+        self.format
+    }
+
     /// Set the attributes of the given ANSI terminal to match the current Style.
     pub(crate) fn set_terminal_attributes<W: Write>(self, terminal: &mut W) {
         // Since we cannot rely on NoBold reseting the bold style (see
