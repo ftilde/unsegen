@@ -24,15 +24,6 @@
 //!     }
 //! }
 //!
-//! impl Widget for Pager {
-//!     fn space_demand(&self) -> Demand2D {
-//!         self.buffer.space_demand()
-//!     }
-//!     fn draw(&self, window: Window, hints: RenderingHints) {
-//!         self.buffer.draw(window, hints);
-//!     }
-//! }
-//!
 //! impl Container<()> for Pager {
 //!     fn input(&mut self, input: Input, _: &mut ()) -> Option<Input> {
 //!         input
@@ -42,6 +33,9 @@
 //!                     .forwards_on(Key::Char('j')),
 //!             )
 //!             .finish()
+//!     }
+//!     fn as_widget<'a>(&'a self) -> Box<dyn Widget + 'a> {
+//!         Box::new(self.buffer.as_widget())
 //!     }
 //! }
 //!
@@ -59,7 +53,7 @@
 //! impl ContainerProvider for App {
 //!     type Parameters = ();
 //!     type Index = Index;
-//!     fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b Container<Self::Parameters> {
+//!     fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b dyn Container<Self::Parameters> {
 //!         match index {
 //!             Index::Left => &self.left,
 //!             Index::Right => &self.right,
@@ -68,7 +62,7 @@
 //!     fn get_mut<'a, 'b: 'a>(
 //!         &'b mut self,
 //!         index: &'a Self::Index,
-//!     ) -> &'b mut Container<Self::Parameters> {
+//!     ) -> &'b mut dyn Container<Self::Parameters> {
 //!         match index {
 //!             Index::Left => &mut self.left,
 //!             Index::Right => &mut self.right,

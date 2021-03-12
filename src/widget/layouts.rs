@@ -649,54 +649,54 @@ mod test {
     }
 
     fn aeq_horizontal_layout_space_demand(
-        widgets: Vec<&dyn Widget>,
+        widgets: Vec<FakeWidget>,
         solution: (ColDemand, RowDemand),
     ) {
         let demand2d = Demand2D {
             width: solution.0,
             height: solution.1,
         };
-        assert_eq!(
-            HorizontalLayout::new(SeparatingStyle::None).space_demand(widgets.as_slice()),
-            demand2d
-        );
+        let mut layout = HLayout::new();
+        for widget in widgets {
+            layout = layout.widget(widget);
+        }
+        assert_eq!(layout.space_demand(), demand2d);
     }
     #[test]
     fn test_horizontal_layout_space_demand() {
         aeq_horizontal_layout_space_demand(
             vec![
-                &FakeWidget::new((Demand::exact(1), Demand::exact(2))),
-                &FakeWidget::new((Demand::exact(1), Demand::exact(2))),
+                FakeWidget::new((Demand::exact(1), Demand::exact(2))),
+                FakeWidget::new((Demand::exact(1), Demand::exact(2))),
             ],
             (Demand::exact(2), Demand::exact(2)),
         );
         aeq_horizontal_layout_space_demand(
             vec![
-                &FakeWidget::new((Demand::from_to(1, 2), Demand::from_to(1, 3))),
-                &FakeWidget::new((Demand::exact(1), Demand::exact(2))),
+                FakeWidget::new((Demand::from_to(1, 2), Demand::from_to(1, 3))),
+                FakeWidget::new((Demand::exact(1), Demand::exact(2))),
             ],
             (Demand::from_to(2, 3), Demand::from_to(2, 3)),
         );
         aeq_horizontal_layout_space_demand(
             vec![
-                &FakeWidget::new((Demand::at_least(3), Demand::at_least(3))),
-                &FakeWidget::new((Demand::exact(1), Demand::exact(5))),
+                FakeWidget::new((Demand::at_least(3), Demand::at_least(3))),
+                FakeWidget::new((Demand::exact(1), Demand::exact(5))),
             ],
             (Demand::at_least(4), Demand::at_least(5)),
         );
     }
     fn aeq_horizontal_layout_draw(
         terminal_size: (u32, u32),
-        widgets: Vec<&dyn Widget>,
+        widgets: Vec<FakeWidget>,
         solution: &str,
     ) {
         let mut term = FakeTerminal::with_size(terminal_size);
-        let widgets_with_hints: Vec<(&dyn Widget, RenderingHints)> = widgets
-            .into_iter()
-            .map(|w| (w, RenderingHints::default()))
-            .collect();
-        HorizontalLayout::new(SeparatingStyle::None)
-            .draw(term.create_root_window(), widgets_with_hints.as_slice());
+        let mut layout = HLayout::new();
+        for widget in widgets {
+            layout = layout.widget(widget);
+        }
+        layout.draw(term.create_root_window(), RenderingHints::default());
         assert_eq!(
             term,
             FakeTerminal::from_str(terminal_size, solution).expect("term from str")
@@ -707,86 +707,86 @@ mod test {
         aeq_horizontal_layout_draw(
             (4, 1),
             vec![
-                &FakeWidget::with_fill_char((Demand::exact(2), Demand::exact(1)), '1'),
-                &FakeWidget::with_fill_char((Demand::exact(2), Demand::exact(1)), '2'),
+                FakeWidget::with_fill_char((Demand::exact(2), Demand::exact(1)), '1'),
+                FakeWidget::with_fill_char((Demand::exact(2), Demand::exact(1)), '2'),
             ],
             "1122",
         );
         aeq_horizontal_layout_draw(
             (4, 1),
             vec![
-                &FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(1)), '1'),
-                &FakeWidget::with_fill_char((Demand::at_least(2), Demand::exact(1)), '2'),
+                FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(1)), '1'),
+                FakeWidget::with_fill_char((Demand::at_least(2), Demand::exact(1)), '2'),
             ],
             "1222",
         );
         aeq_horizontal_layout_draw(
             (4, 2),
             vec![
-                &FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(1)), '1'),
-                &FakeWidget::with_fill_char((Demand::at_least(2), Demand::exact(2)), '2'),
+                FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(1)), '1'),
+                FakeWidget::with_fill_char((Demand::at_least(2), Demand::exact(2)), '2'),
             ],
             "1222 1222",
         );
         aeq_horizontal_layout_draw(
             (8, 1),
             vec![
-                &FakeWidget::with_fill_char((Demand::at_least(1), Demand::at_least(1)), '1'),
-                &FakeWidget::with_fill_char((Demand::at_least(3), Demand::exact(3)), '2'),
+                FakeWidget::with_fill_char((Demand::at_least(1), Demand::at_least(1)), '1'),
+                FakeWidget::with_fill_char((Demand::at_least(3), Demand::exact(3)), '2'),
             ],
             "11112222",
         );
     }
 
     fn aeq_vertical_layout_space_demand(
-        widgets: Vec<&dyn Widget>,
+        widgets: Vec<FakeWidget>,
         solution: (ColDemand, RowDemand),
     ) {
         let demand2d = Demand2D {
             width: solution.0,
             height: solution.1,
         };
-        assert_eq!(
-            VerticalLayout::new(SeparatingStyle::None).space_demand(widgets.as_slice()),
-            demand2d
-        );
+        let mut layout = VLayout::new();
+        for widget in widgets {
+            layout = layout.widget(widget);
+        }
+        assert_eq!(layout.space_demand(), demand2d);
     }
     #[test]
     fn test_vertical_layout_space_demand() {
         aeq_vertical_layout_space_demand(
             vec![
-                &FakeWidget::new((Demand::exact(2), Demand::exact(1))),
-                &FakeWidget::new((Demand::exact(2), Demand::exact(1))),
+                FakeWidget::new((Demand::exact(2), Demand::exact(1))),
+                FakeWidget::new((Demand::exact(2), Demand::exact(1))),
             ],
             (Demand::exact(2), Demand::exact(2)),
         );
         aeq_vertical_layout_space_demand(
             vec![
-                &FakeWidget::new((Demand::from_to(1, 3), Demand::from_to(1, 2))),
-                &FakeWidget::new((Demand::exact(2), Demand::exact(1))),
+                FakeWidget::new((Demand::from_to(1, 3), Demand::from_to(1, 2))),
+                FakeWidget::new((Demand::exact(2), Demand::exact(1))),
             ],
             (Demand::from_to(2, 3), Demand::from_to(2, 3)),
         );
         aeq_vertical_layout_space_demand(
             vec![
-                &FakeWidget::new((Demand::at_least(3), Demand::at_least(3))),
-                &FakeWidget::new((Demand::exact(5), Demand::exact(1))),
+                FakeWidget::new((Demand::at_least(3), Demand::at_least(3))),
+                FakeWidget::new((Demand::exact(5), Demand::exact(1))),
             ],
             (Demand::at_least(5), Demand::at_least(4)),
         );
     }
     fn aeq_vertical_layout_draw(
         terminal_size: (u32, u32),
-        widgets: Vec<&dyn Widget>,
+        widgets: Vec<FakeWidget>,
         solution: &str,
     ) {
         let mut term = FakeTerminal::with_size(terminal_size);
-        let widgets_with_hints: Vec<(&dyn Widget, RenderingHints)> = widgets
-            .into_iter()
-            .map(|w| (w, RenderingHints::default()))
-            .collect();
-        VerticalLayout::new(SeparatingStyle::None)
-            .draw(term.create_root_window(), widgets_with_hints.as_slice());
+        let mut layout = VLayout::new();
+        for widget in widgets {
+            layout = layout.widget(widget);
+        }
+        layout.draw(term.create_root_window(), RenderingHints::default());
         assert_eq!(
             term,
             FakeTerminal::from_str(terminal_size, solution).expect("term from str")
@@ -797,32 +797,32 @@ mod test {
         aeq_vertical_layout_draw(
             (1, 4),
             vec![
-                &FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(2)), '1'),
-                &FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(2)), '2'),
+                FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(2)), '1'),
+                FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(2)), '2'),
             ],
             "1 1 2 2",
         );
         aeq_vertical_layout_draw(
             (1, 4),
             vec![
-                &FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(1)), '1'),
-                &FakeWidget::with_fill_char((Demand::exact(1), Demand::at_least(2)), '2'),
+                FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(1)), '1'),
+                FakeWidget::with_fill_char((Demand::exact(1), Demand::at_least(2)), '2'),
             ],
             "1 2 2 2",
         );
         aeq_vertical_layout_draw(
             (2, 4),
             vec![
-                &FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(1)), '1'),
-                &FakeWidget::with_fill_char((Demand::exact(2), Demand::at_least(2)), '2'),
+                FakeWidget::with_fill_char((Demand::exact(1), Demand::exact(1)), '1'),
+                FakeWidget::with_fill_char((Demand::exact(2), Demand::at_least(2)), '2'),
             ],
             "11 22 22 22",
         );
         aeq_vertical_layout_draw(
             (1, 8),
             vec![
-                &FakeWidget::with_fill_char((Demand::at_least(2), Demand::at_least(2)), '1'),
-                &FakeWidget::with_fill_char((Demand::at_least(1), Demand::at_least(1)), '2'),
+                FakeWidget::with_fill_char((Demand::at_least(2), Demand::at_least(2)), '1'),
+                FakeWidget::with_fill_char((Demand::at_least(1), Demand::at_least(1)), '2'),
             ],
             "1 1 1 1 2 2 2 2",
         );

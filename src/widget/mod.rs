@@ -3,27 +3,25 @@
 //!
 //! # Example:
 //! ```no_run //tests do not provide a fully functional terminal
+//!
 //! use unsegen::base::*;
 //! use unsegen::widget::*;
 //! use unsegen::widget::builtin::*;
 //! use std::io::stdout;
 //!
 //! struct MyWidget {
-//!     layout: VerticalLayout,
 //!     prompt: PromptLine,
 //!     buffer: LogViewer,
 //! }
 //!
-//! impl Widget for MyWidget {
-//!    fn space_demand(&self) -> Demand2D {
-//!        let widgets: Vec<&Widget> = vec![&self.prompt, &self.buffer];
-//!        self.layout.space_demand(widgets.as_slice())
-//!    }
-//!    fn draw(&self, window: Window, hints: RenderingHints) {
-//!        let widgets: Vec<(&Widget, RenderingHints)> =
-//!            vec![(&self.prompt, hints), (&self.buffer, hints.active(false))];
-//!        self.layout.draw(window, widgets.as_slice());
-//!    }
+//! impl MyWidget {
+//!     fn as_widget<'a>(&'a self) -> impl Widget + 'a {
+//!         VLayout::new().alterating(StyleModifier::new().invert(true))
+//!             .widget("Some text before")
+//!             .widget(self.prompt.as_widget())
+//!             .widget(self.buffer.as_widget())
+//!             .widget("Some text after")
+//!     }
 //! }
 //!
 //!
@@ -31,9 +29,6 @@
 //!     let stdout = stdout();
 //!     let mut term = Terminal::new(stdout.lock()).unwrap();
 //!     let mut widget = MyWidget {
-//!         layout: VerticalLayout::new(
-//!             SeparatingStyle::AlternatingStyle(StyleModifier::new().invert(true))
-//!         ),
 //!         prompt: PromptLine::with_prompt(" > ".to_owned()),
 //!         buffer: LogViewer::new(),
 //!     };
@@ -42,7 +37,7 @@
 //!         // Put application logic here: read input, chain behavior, react to other stuff
 //!         {
 //!             let win = term.create_root_window();
-//!             widget.draw(win, RenderingHints::new().active(true));
+//!             widget.as_widget().draw(win, RenderingHints::new().active(true));
 //!         }
 //!         term.present();
 //!     }
