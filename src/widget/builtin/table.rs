@@ -212,6 +212,82 @@ impl<'a, R: TableRow + 'static> TableWidget<'a, R> {
         let separator_width = self.col_sep_style.width();
         layout_linearly(window.get_width(), separator_width, &x_demands)
     }
+
+    fn draw_row<'w>(
+        &self,
+        row: &R,
+        row_index: usize,
+        window: Window<'w>,
+        column_widths: &[Width],
+        hints: RenderingHints,
+    ) -> Option<Window<'w>> {
+        let height = row.height_demand().min;
+        let (mut row_window, rest_window) = match window.split(height.from_origin()) {
+            Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
+            Err(row_window) => (row_window, None),
+        };
+
+        let window = rest_window;
+
+        if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
+            (row_index % 2, &self.row_sep_style)
+        {
+            row_window.modify_default_style(modifier);
+        }
+
+        let mut iter = R::COLUMNS
+            .iter()
+            .zip(column_widths.iter())
+            .enumerate()
+            .peekable();
+        while let Some((col_index, (col, &pos))) = iter.next() {
+            let (mut cell_window, r) = row_window
+                .split(pos.from_origin())
+                .expect("valid split pos from layout");
+            row_window = r;
+
+            if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
+                (col_index % 2, &self.col_sep_style)
+            {
+                cell_window.modify_default_style(modifier);
+            }
+
+            let cell_draw_hints = if row_index as u32 == self.table.row_pos
+                && col_index as u32 == self.table.col_pos
+            {
+                cell_window.modify_default_style(self.focused_style);
+                hints
+            } else {
+                hints.active(false)
+            };
+
+            cell_window.clear(); // Fill background using new style
+            (col.access)(row).draw(cell_window, cell_draw_hints);
+            if let (Some(_), &SeparatingStyle::Draw(ref c)) = (iter.peek(), &self.col_sep_style) {
+                if row_window.get_width() > 0 {
+                    let (mut sep_window, r) = row_window
+                        .split(Width::from(c.width()).from_origin())
+                        .expect("valid split pos from layout");
+                    row_window = r;
+                    sep_window.fill(c.clone());
+                }
+            }
+        }
+
+        window
+    }
+    fn draw_separator<'w>(&self, window: Window<'w>) -> Option<Window<'w>> {
+        if let &SeparatingStyle::Draw(ref c) = &self.row_sep_style {
+            let (mut sep_window, rest_window) = match window.split(RowIndex::from(1)) {
+                Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
+                Err(row_window) => (row_window, None),
+            };
+            sep_window.fill(c.clone());
+            rest_window
+        } else {
+            Some(window)
+        }
+    }
 }
 
 impl<'a, R: TableRow + 'static> Widget for TableWidget<'a, R> {
@@ -248,74 +324,10 @@ impl<'a, R: TableRow + 'static> Widget for TableWidget<'a, R> {
 
         let mut window = Some(window);
         let mut row_iter = self.table.rows.iter().enumerate().peekable();
-        while let Some((row_index, row)) = row_iter.next() {
-            if window.is_none() {
-                break;
-            }
-            let height = row.height_demand().min;
-            let (mut row_window, rest_window) = match window.unwrap().split(height.from_origin()) {
-                Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
-                Err(row_window) => (row_window, None),
-            };
-            window = rest_window;
-
-            if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
-                (row_index % 2, &self.row_sep_style)
-            {
-                row_window.modify_default_style(modifier);
-            }
-
-            let mut iter = R::COLUMNS
-                .iter()
-                .zip(column_widths.iter())
-                .enumerate()
-                .peekable();
-            while let Some((col_index, (col, &pos))) = iter.next() {
-                let (mut cell_window, r) = row_window
-                    .split(pos.from_origin())
-                    .expect("valid split pos from layout");
-                row_window = r;
-
-                if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
-                    (col_index % 2, &self.col_sep_style)
-                {
-                    cell_window.modify_default_style(modifier);
-                }
-
-                let cell_draw_hints = if row_index as u32 == self.table.row_pos
-                    && col_index as u32 == self.table.col_pos
-                {
-                    cell_window.modify_default_style(self.focused_style);
-                    hints
-                } else {
-                    hints.active(false)
-                };
-
-                cell_window.clear(); // Fill background using new style
-                (col.access)(row).draw(cell_window, cell_draw_hints);
-                if let (Some(_), &SeparatingStyle::Draw(ref c)) = (iter.peek(), &self.col_sep_style)
-                {
-                    if row_window.get_width() > 0 {
-                        let (mut sep_window, r) = row_window
-                            .split(Width::from(c.width()).from_origin())
-                            .expect("valid split pos from layout");
-                        row_window = r;
-                        sep_window.fill(c.clone());
-                    }
-                }
-            }
-            if let (Some(_), &SeparatingStyle::Draw(ref c)) = (row_iter.peek(), &self.row_sep_style)
-            {
-                if window.is_none() {
-                    break;
-                }
-                let (mut sep_window, rest_window) =
-                    match window.unwrap().split(height.from_origin()) {
-                        Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
-                        Err(row_window) => (row_window, None),
-                    };
-                window = rest_window;
-                sep_window.fill(c.clone());
+        while let (Some((row_index, row)), Some(w)) = (row_iter.next(), window) {
+            window = self.draw_row(row, row_index, w, &column_widths, hints);
+            if row_iter.peek().is_some() && window.is_some() {
+                window = self.draw_separator(window.unwrap());
             }
         }
     }
@@ -399,21 +411,32 @@ mod test {
         table
     }
 
-    fn aeq_table_draw(terminal_size: (u32, u32), solution: &str, table: &Table<TestRow>) {
+    fn aeq_table_draw(
+        terminal_size: (u32, u32),
+        solution: &str,
+        table: &Table<TestRow>,
+        f: impl Fn(TableWidget<TestRow>) -> TableWidget<TestRow>,
+    ) {
         let mut term = FakeTerminal::with_size(terminal_size);
-        table
-            .as_widget()
-            .focused(StyleModifier::new().bold(true))
-            .draw(term.create_root_window(), RenderingHints::default());
+        f(table.as_widget()).draw(term.create_root_window(), RenderingHints::default());
         assert_eq!(
             term,
             FakeTerminal::from_str(terminal_size, solution).expect("term from str")
         );
     }
+    fn aeq_table_draw_focused_bold(
+        terminal_size: (u32, u32),
+        solution: &str,
+        table: &Table<TestRow>,
+    ) {
+        aeq_table_draw(terminal_size, solution, table, |t: TableWidget<TestRow>| {
+            t.focused(StyleModifier::new().bold(true))
+        });
+    }
 
     #[test]
     fn smaller_than_terminal() {
-        aeq_table_draw((1, 3), "*0* 1 2", &test_table(10));
+        aeq_table_draw((1, 3), "0 1 2", &test_table(10), |t| t);
         //aeq_table_draw((1, 3), "0 1 ↓", &test_table(10));
     }
 
@@ -421,18 +444,46 @@ mod test {
     fn scroll_down() {
         let mut table = test_table(6);
         let size = (1, 4);
-        aeq_table_draw(size, "*0* 1 2 3", &table);
+        aeq_table_draw_focused_bold(size, "*0* 1 2 3", &table);
         //aeq_table_draw((4, 1), "0 1 2 ↓", &test_table(10));
         table.move_down().unwrap();
-        aeq_table_draw(size, "0 *1* 2 3", &table);
+        aeq_table_draw_focused_bold(size, "0 *1* 2 3", &table);
         table.move_down().unwrap();
-        aeq_table_draw(size, "0 1 *2* 3", &table);
+        aeq_table_draw_focused_bold(size, "0 1 *2* 3", &table);
         table.move_down().unwrap();
-        aeq_table_draw(size, "0 1 2 *3*", &table);
+        aeq_table_draw_focused_bold(size, "0 1 2 *3*", &table);
         table.move_down().unwrap();
-        aeq_table_draw(size, "0 1 2 3", &table);
+        aeq_table_draw_focused_bold(size, "0 1 2 3", &table);
         table.move_down().unwrap();
-        aeq_table_draw(size, "0 1 2 3", &table);
+        aeq_table_draw_focused_bold(size, "0 1 2 3", &table);
         assert!(table.move_down().is_err());
+    }
+
+    #[test]
+    fn sep_alternate_rows() {
+        let table = test_table(4);
+        aeq_table_draw((1, 4), "0 *1* 2 *3*", &table, |t| {
+            t.row_separation(SeparatingStyle::AlternatingStyle(
+                StyleModifier::new().bold(true),
+            ))
+        });
+    }
+
+    #[test]
+    fn sep_char() {
+        let table = test_table(4);
+        aeq_table_draw((1, 7), "0 X 1 X 2 X 3", &table, |t| {
+            t.row_separation(SeparatingStyle::Draw(
+                crate::base::GraphemeCluster::try_from('X').unwrap(),
+            ))
+        });
+    }
+
+    #[test]
+    fn sep_none() {
+        let table = test_table(4);
+        aeq_table_draw((1, 4), "0 1 2 3", &table, |t| {
+            t.row_separation(SeparatingStyle::None)
+        });
     }
 }
