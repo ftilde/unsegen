@@ -371,7 +371,7 @@ impl<'a, R: TableRow + 'static> Widget for TableWidget<'a, R> {
         let min_diff = Height::new_unchecked(self.min_context as i32);
 
         let current_row_begin = current_row_begin
-            .min(window.get_height().from_origin() - 1 - min_diff)
+            .min(window.get_height().from_origin() - current_row_height - min_diff)
             .max(min_diff.from_origin());
 
         let widgets_above = &self.table.rows[..current_row_pos as usize];
@@ -628,6 +628,22 @@ mod test {
 
     #[test]
     fn scroll_down_multiline() {
+        let mut table = test_table_str(&["a\nb", "c", "d\ne\n", "f", "g\nh"]);
+        let size = (1, 4);
+        aeq_table_draw_focused_bold(size, "*ab* c d", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold(size, "ab *c* d", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold(size, "c *de* f", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold(size, "de *f* g", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold(size, "d f *gh*", &table);
+        assert!(table.move_down().is_err());
+    }
+
+    #[test]
+    fn scroll_down_multiline_sep() {
         let mut table = test_table_str(&["a\nb", "c", "d\ne\nf", "f", "g\nh"]);
         let size = (1, 4);
         aeq_table_draw_focused_bold_sep_x(size, "*ab* X c", &table);
