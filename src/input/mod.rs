@@ -176,10 +176,43 @@ impl InputChain {
         }
     }
 
+    /// Add another behavior to the line of input processors that will try to consume the event one
+    /// after another.
+    ///
+    /// If this chain element consumes the input, `f` is executed.
+    pub fn chain_and_then<B: Behavior>(self, behavior: B, f: impl FnOnce()) -> InputChain {
+        if let Some(event) = self.input {
+            let input = behavior.input(event);
+            if input.is_none() {
+                // Previously present, but now consumed
+                f();
+            }
+            InputChain { input }
+        } else {
+            InputChain { input: None }
+        }
+    }
+
     /// Unpack the final chain value. If the `Input` was consumed by some `Behavior`, the result
     /// will be None, otherwise the original `Input` will be returned.
     pub fn finish(self) -> Option<Input> {
         self.input
+    }
+
+    /// Execute the provided function only if the input was consumed previously in the chain.
+    pub fn if_consumed(self, f: impl FnOnce()) -> Self {
+        if self.input.is_none() {
+            f()
+        }
+        self
+    }
+
+    /// Execute the provided function only if the input not was consumed previously in the chain.
+    pub fn if_not_consumed(self, f: impl FnOnce()) -> Self {
+        if self.input.is_some() {
+            f()
+        }
+        self
     }
 }
 impl From<Input> for InputChain {
