@@ -5,6 +5,7 @@ use base::basic_types::*;
 use base::{StyleModifier, Window};
 use input::Scrollable;
 use input::{Behavior, Input, Navigatable, OperationResult};
+use std::cell::Cell;
 use widget::{
     layout_linearly, ColDemand, Demand, Demand2D, RenderingHints, RowDemand, SeparatingStyle,
     Widget,
@@ -84,6 +85,7 @@ pub struct Table<R: TableRow> {
     rows: Vec<R>,
     row_pos: u32,
     col_pos: u32,
+    last_draw_pos: Cell<(u32, RowIndex)>,
 }
 
 impl<R: TableRow + 'static> Table<R> {
@@ -94,6 +96,7 @@ impl<R: TableRow + 'static> Table<R> {
             rows: Vec::new(),
             row_pos: 0,
             col_pos: 0,
+            last_draw_pos: Cell::new((0, RowIndex::new(0))),
         }
     }
 
@@ -163,6 +166,7 @@ impl<R: TableRow + 'static> Table<R> {
             row_sep_style: SeparatingStyle::None,
             col_sep_style: SeparatingStyle::None,
             focused_style: StyleModifier::new(),
+            min_context: 1,
         }
     }
 }
@@ -183,6 +187,7 @@ pub struct TableWidget<'a, R: TableRow + 'static> {
     row_sep_style: SeparatingStyle,
     col_sep_style: SeparatingStyle,
     focused_style: StyleModifier,
+    min_context: u32,
 }
 
 impl<'a, R: TableRow + 'static> TableWidget<'a, R> {
@@ -201,6 +206,11 @@ impl<'a, R: TableRow + 'static> TableWidget<'a, R> {
         self
     }
 
+    pub fn min_context(mut self, rows: u32) -> Self {
+        self.min_context = rows;
+        self
+    }
+
     fn layout_columns(&self, window: &Window) -> Box<[Width]> {
         let mut x_demands = vec![Demand::zero(); R::num_columns()];
         for row in self.table.rows.iter() {
@@ -216,23 +226,15 @@ impl<'a, R: TableRow + 'static> TableWidget<'a, R> {
     fn draw_row<'w>(
         &self,
         row: &R,
-        row_index: usize,
-        window: Window<'w>,
+        row_index: u32,
+        mut window: Window<'w>,
         column_widths: &[Width],
         hints: RenderingHints,
-    ) -> Option<Window<'w>> {
-        let height = row.height_demand().min;
-        let (mut row_window, rest_window) = match window.split(height.from_origin()) {
-            Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
-            Err(row_window) => (row_window, None),
-        };
-
-        let window = rest_window;
-
+    ) {
         if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
             (row_index % 2, &self.row_sep_style)
         {
-            row_window.modify_default_style(modifier);
+            window.modify_default_style(modifier);
         }
 
         let mut iter = R::COLUMNS
@@ -241,10 +243,10 @@ impl<'a, R: TableRow + 'static> TableWidget<'a, R> {
             .enumerate()
             .peekable();
         while let Some((col_index, (col, &pos))) = iter.next() {
-            let (mut cell_window, r) = row_window
+            let (mut cell_window, r) = window
                 .split(pos.from_origin())
                 .expect("valid split pos from layout");
-            row_window = r;
+            window = r;
 
             if let (1, &SeparatingStyle::AlternatingStyle(modifier)) =
                 (col_index % 2, &self.col_sep_style)
@@ -252,50 +254,32 @@ impl<'a, R: TableRow + 'static> TableWidget<'a, R> {
                 cell_window.modify_default_style(modifier);
             }
 
-            let cell_draw_hints = if row_index as u32 == self.table.row_pos
-                && col_index as u32 == self.table.col_pos
-            {
-                cell_window.modify_default_style(self.focused_style);
-                hints
-            } else {
-                hints.active(false)
-            };
+            let cell_draw_hints =
+                if row_index == self.table.row_pos && col_index as u32 == self.table.col_pos {
+                    cell_window.modify_default_style(self.focused_style);
+                    hints
+                } else {
+                    hints.active(false)
+                };
 
             cell_window.clear(); // Fill background using new style
             (col.access)(row).draw(cell_window, cell_draw_hints);
             if let (Some(_), &SeparatingStyle::Draw(ref c)) = (iter.peek(), &self.col_sep_style) {
-                if row_window.get_width() > 0 {
-                    let (mut sep_window, r) = row_window
+                if window.get_width() > 0 {
+                    let (mut sep_window, r) = window
                         .split(Width::from(c.width()).from_origin())
                         .expect("valid split pos from layout");
-                    row_window = r;
+                    window = r;
                     sep_window.fill(c.clone());
                 }
             }
         }
-
-        window
     }
-    fn draw_separator<'w>(&self, window: Window<'w>) -> Option<Window<'w>> {
-        if let &SeparatingStyle::Draw(ref c) = &self.row_sep_style {
-            let (mut sep_window, rest_window) = match window.split(RowIndex::from(1)) {
-                Ok((row_window, rest_window)) => (row_window, Some(rest_window)),
-                Err(row_window) => (row_window, None),
-            };
-            sep_window.fill(c.clone());
-            rest_window
-        } else {
-            Some(window)
-        }
-    }
-}
-
-impl<'a, R: TableRow + 'static> Widget for TableWidget<'a, R> {
-    fn space_demand(&self) -> Demand2D {
+    fn rows_space_demand(&self, rows: &[R]) -> Demand2D {
         let mut x_demands = vec![Demand::exact(0); R::num_columns()];
         let mut y_demand = Demand::zero();
 
-        let mut row_iter = self.table.rows.iter().peekable();
+        let mut row_iter = rows.iter().peekable();
         while let Some(row) = row_iter.next() {
             let mut row_max_y = Demand::exact(0);
             for (col_num, col) in R::COLUMNS.iter().enumerate() {
@@ -319,15 +303,151 @@ impl<'a, R: TableRow + 'static> Widget for TableWidget<'a, R> {
             height: y_demand,
         }
     }
+}
+
+impl<'a, R: TableRow + 'static> Widget for TableWidget<'a, R> {
+    fn space_demand(&self) -> Demand2D {
+        self.rows_space_demand(&self.table.rows[..])
+    }
     fn draw(&self, window: Window, hints: RenderingHints) {
+        fn split_top(window: Window, pos: RowIndex) -> (Window, Option<Window>) {
+            match window.split(pos) {
+                Ok((window, below)) => (window, Some(below)),
+                Err(window) => (window, None),
+            }
+        }
+
+        fn split_bottom(window: Window, pos: RowIndex) -> (Option<Window>, Window) {
+            let split_pos = (window.get_height().from_origin() - pos).from_origin();
+            match window.split(split_pos) {
+                Ok((above, window)) => (Some(above), window),
+                Err(window) => (None, window),
+            }
+        }
+
+        let separator_height = if let &SeparatingStyle::Draw(_) = &self.row_sep_style {
+            Height::new_unchecked(1)
+        } else {
+            Height::new_unchecked(0)
+        };
+
+        let max_height = window.get_height();
+        let row_height = |r: &R| r.height_demand().max.unwrap_or(max_height); //TODO: choose min or max here and below?
+        let demand_height = |d: Demand2D| d.height.max.unwrap_or(max_height);
+
         let column_widths = self.layout_columns(&window);
 
-        let mut window = Some(window);
-        let mut row_iter = self.table.rows.iter().enumerate().peekable();
-        while let (Some((row_index, row)), Some(w)) = (row_iter.next(), window) {
-            window = self.draw_row(row, row_index, w, &column_widths, hints);
-            if row_iter.peek().is_some() && window.is_some() {
-                window = self.draw_separator(window.unwrap());
+        let current = if let Some(r) = self.table.current_row() {
+            r
+        } else {
+            return;
+        };
+        let current_row_height = row_height(current);
+        let current_row_pos = self.table.row_pos;
+
+        let (old_pos, old_draw_row) = self.table.last_draw_pos.get();
+        let current_row_begin = match old_pos.cmp(&current_row_pos) {
+            std::cmp::Ordering::Less => {
+                let range = &self.table.rows[old_pos as usize..current_row_pos as usize];
+                old_draw_row + demand_height(self.rows_space_demand(range)) + separator_height
+            }
+            std::cmp::Ordering::Equal => old_draw_row,
+            std::cmp::Ordering::Greater => {
+                let range = &self.table.rows
+                    [current_row_pos as usize..(old_pos as usize).min(self.table.rows.len())];
+                old_draw_row - demand_height(self.rows_space_demand(range)) - separator_height
+            }
+        };
+
+        let min_diff = Height::new_unchecked(self.min_context as i32);
+
+        let current_row_begin = current_row_begin
+            .min(window.get_height().from_origin() - 1 - min_diff)
+            .max(min_diff.from_origin());
+
+        let widgets_above = &self.table.rows[..current_row_pos as usize];
+        let widgets_below = &self.table.rows[(current_row_pos + 1) as usize..];
+
+        let max_above_height = demand_height(self.rows_space_demand(widgets_above))
+            + if widgets_above.is_empty() {
+                Height::new_unchecked(0)
+            } else {
+                separator_height
+            };
+        let max_below_height = demand_height(self.rows_space_demand(widgets_below))
+            + if widgets_below.is_empty() {
+                Height::new_unchecked(0)
+            } else {
+                separator_height
+            };
+
+        let min_current_pos_begin =
+            window.get_height().from_origin() - max_below_height - current_row_height;
+        let max_current_pos_begin = max_above_height.from_origin();
+
+        let current_row_begin = current_row_begin
+            .max(min_current_pos_begin)
+            .min(max_current_pos_begin);
+
+        self.table
+            .last_draw_pos
+            .set((current_row_pos, current_row_begin));
+
+        let (window, mut below) = split_top(window, current_row_begin + current_row_height);
+        let (mut above, window) = split_bottom(window, current_row_height.from_origin());
+
+        self.draw_row(current, current_row_pos, window, &column_widths, hints);
+
+        // All rows below current
+        for (row_pos, row) in widgets_below
+            .iter()
+            .enumerate()
+            .map(|(i, row)| (i as u32 + current_row_pos + 1, row))
+        {
+            if let &SeparatingStyle::Draw(ref c) = &self.row_sep_style {
+                if let Some(w) = below {
+                    let (mut sep_window, rest) = split_top(w, RowIndex::from(1));
+                    below = rest;
+
+                    sep_window.fill(c.clone());
+                } else {
+                    break;
+                }
+            }
+
+            if let Some(w) = below {
+                let (row_window, rest) = split_top(w, row_height(row).from_origin());
+                below = rest;
+                self.draw_row(row, row_pos, row_window, &column_widths, hints);
+            } else {
+                break;
+            }
+        }
+
+        // All rows above current
+        for (row_pos, row) in widgets_above
+            .iter()
+            .enumerate()
+            .rev()
+            .map(|(i, row)| (i as u32, row))
+        {
+            if let &SeparatingStyle::Draw(ref c) = &self.row_sep_style {
+                if let Some(w) = above {
+                    let (rest, mut sep_window) = split_bottom(w, RowIndex::from(1));
+                    above = rest;
+
+                    sep_window.fill(c.clone());
+                } else {
+                    break;
+                }
+            }
+
+            if let Some(w) = above {
+                let (rest, row_window) = split_bottom(w, row_height(row).from_origin());
+                above = rest;
+                self.draw_row(row, row_pos, row_window, &column_widths, hints);
+            } else {
+                break;
             }
         }
     }
@@ -390,7 +510,7 @@ impl<R: TableRow + 'static> Scrollable for Table<R> {
 mod test {
     use super::*;
     use base::test::FakeTerminal;
-    use base::StyleModifier;
+    use base::{GraphemeCluster, StyleModifier};
 
     struct TestRow(String);
     impl TableRow for TestRow {
@@ -411,6 +531,17 @@ mod test {
         table
     }
 
+    fn test_table_str(lines: &[&str]) -> Table<TestRow> {
+        let mut table = Table::new();
+        {
+            let mut rows = table.rows_mut();
+            for l in lines {
+                rows.push(TestRow(l.to_string()));
+            }
+        }
+        table
+    }
+
     fn aeq_table_draw(
         terminal_size: (u32, u32),
         solution: &str,
@@ -421,7 +552,8 @@ mod test {
         f(table.as_widget()).draw(term.create_root_window(), RenderingHints::default());
         assert_eq!(
             term,
-            FakeTerminal::from_str(terminal_size, solution).expect("term from str")
+            FakeTerminal::from_str(terminal_size, solution).expect("term from str"),
+            "got <-> expected"
         );
     }
     fn aeq_table_draw_focused_bold(
@@ -434,29 +566,104 @@ mod test {
         });
     }
 
-    #[test]
-    fn smaller_than_terminal() {
-        aeq_table_draw((1, 3), "0 1 2", &test_table(10), |t| t);
-        //aeq_table_draw((1, 3), "0 1 ↓", &test_table(10));
+    fn aeq_table_draw_focused_bold_sep_x(
+        terminal_size: (u32, u32),
+        solution: &str,
+        table: &Table<TestRow>,
+    ) {
+        aeq_table_draw(terminal_size, solution, table, |t: TableWidget<TestRow>| {
+            t.focused(StyleModifier::new().bold(true))
+                .row_separation(SeparatingStyle::Draw(
+                    GraphemeCluster::try_from('X').unwrap(),
+                ))
+        });
     }
 
     #[test]
-    fn scroll_down() {
+    fn smaller_than_terminal() {
+        aeq_table_draw((1, 3), "0 1 2", &test_table(10), |t| t);
+    }
+
+    #[test]
+    fn scroll_down_simple() {
         let mut table = test_table(6);
         let size = (1, 4);
         aeq_table_draw_focused_bold(size, "*0* 1 2 3", &table);
-        //aeq_table_draw((4, 1), "0 1 2 ↓", &test_table(10));
         table.move_down().unwrap();
         aeq_table_draw_focused_bold(size, "0 *1* 2 3", &table);
         table.move_down().unwrap();
         aeq_table_draw_focused_bold(size, "0 1 *2* 3", &table);
         table.move_down().unwrap();
-        aeq_table_draw_focused_bold(size, "0 1 2 *3*", &table);
+        aeq_table_draw_focused_bold(size, "1 2 *3* 4", &table);
         table.move_down().unwrap();
-        aeq_table_draw_focused_bold(size, "0 1 2 3", &table);
+        aeq_table_draw_focused_bold(size, "2 3 *4* 5", &table);
         table.move_down().unwrap();
-        aeq_table_draw_focused_bold(size, "0 1 2 3", &table);
+        aeq_table_draw_focused_bold(size, "2 3 4 *5*", &table);
         assert!(table.move_down().is_err());
+    }
+
+    #[test]
+    fn scroll_down_sep() {
+        let mut table = test_table(4);
+        let size = (1, 4);
+        aeq_table_draw_focused_bold_sep_x(size, "*0* X 1 X", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "0 X *1* X", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "1 X *2* X", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "X 2 X *3*", &table);
+        assert!(table.move_down().is_err());
+    }
+
+    #[test]
+    fn scroll_down_multiline() {
+        let mut table = test_table_str(&["a\nb", "c", "d\ne\nf", "f", "g\nh"]);
+        let size = (1, 4);
+        aeq_table_draw_focused_bold_sep_x(size, "*ab* X c", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "a X *c* X", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "X *def*", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "d X *f* X", &table);
+        table.move_down().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "f X *gh*", &table);
+        assert!(table.move_down().is_err());
+    }
+
+    #[test]
+    fn scroll_up_simple() {
+        let mut table = test_table(6);
+        let size = (1, 4);
+        table.scroll_to_end().unwrap();
+        aeq_table_draw_focused_bold(size, "2 3 4 *5*", &table);
+        table.move_up().unwrap();
+        aeq_table_draw_focused_bold(size, "2 3 *4* 5", &table);
+        table.move_up().unwrap();
+        aeq_table_draw_focused_bold(size, "2 *3* 4 5", &table);
+        table.move_up().unwrap();
+        aeq_table_draw_focused_bold(size, "1 *2* 3 4", &table);
+        table.move_up().unwrap();
+        aeq_table_draw_focused_bold(size, "0 *1* 2 3", &table);
+        table.move_up().unwrap();
+        aeq_table_draw_focused_bold(size, "*0* 1 2 3", &table);
+        assert!(table.move_up().is_err());
+    }
+
+    #[test]
+    fn scroll_up_sep() {
+        let mut table = test_table(4);
+        let size = (1, 4);
+        table.scroll_to_end().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "X 2 X *3*", &table);
+        table.move_up().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "X *2* X 3", &table);
+        table.move_up().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "X *1* X 2", &table);
+        table.move_up().unwrap();
+        aeq_table_draw_focused_bold_sep_x(size, "*0* X 1 X", &table);
+        assert!(table.move_up().is_err());
     }
 
     #[test]
@@ -474,7 +681,7 @@ mod test {
         let table = test_table(4);
         aeq_table_draw((1, 7), "0 X 1 X 2 X 3", &table, |t| {
             t.row_separation(SeparatingStyle::Draw(
-                crate::base::GraphemeCluster::try_from('X').unwrap(),
+                GraphemeCluster::try_from('X').unwrap(),
             ))
         });
     }
