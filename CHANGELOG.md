@@ -11,7 +11,8 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 ### Changed
 - Change `Widget` semantics to be short-lived.
 - Replace `{Horizontal,Vertical}Layout` with `{H,V}Layout` which are short-lived and implement Widget. [BC]
-- Make table scroll properly when window is too small to show whole table.
+- Make `Table` scroll properly when window is too small to show whole table.
+- Add `BehaviorContext` to `TableRow` trait. This allows passing parameters to the `behavior` of a column.
 
 ## [0.2.5] - 2020-11-14
 ### Fixed

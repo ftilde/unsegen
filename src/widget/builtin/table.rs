@@ -17,11 +17,11 @@ use widget::{
 /// and how it reacts to input.
 ///
 /// In a sense this is only necessary because we do not have variadic generics.
-pub struct Column<T: ?Sized> {
+pub struct Column<T: TableRow + ?Sized> {
     /// Immutable widget access.
     pub access: for<'a> fn(&'a T) -> Box<dyn Widget + 'a>,
     /// Input processing
-    pub behavior: fn(&mut T, Input) -> Option<Input>,
+    pub behavior: fn(&mut T, Input, &mut T::BehaviorContext) -> Option<Input>,
 }
 
 /// This trait both (statically) describes the layout of the table (`COLUMNS`) and represents a
@@ -29,6 +29,7 @@ pub struct Column<T: ?Sized> {
 ///
 /// Implement this trait, if you want to create a `Table`!
 pub trait TableRow: 'static {
+    type BehaviorContext;
     /// Define the behavior of individual columns of the table.
     const COLUMNS: &'static [Column<Self>];
 
@@ -145,10 +146,14 @@ impl<R: TableRow + 'static> Table<R> {
         &R::COLUMNS[self.col_pos as usize]
     }
 
-    fn pass_event_to_current_cell(&mut self, i: Input) -> Option<Input> {
+    fn pass_event_to_current_cell(
+        &mut self,
+        i: Input,
+        p: &mut R::BehaviorContext,
+    ) -> Option<Input> {
         let col_behavior = self.current_col().behavior;
         if let Some(row) = self.current_row_mut() {
-            col_behavior(row, i)
+            col_behavior(row, i, p)
         } else {
             Some(i)
         }
@@ -156,8 +161,11 @@ impl<R: TableRow + 'static> Table<R> {
 
     /// Create a `Behavior` which can be used to send input directly to the currently active cell
     /// by adding it to an `InputChain`.
-    pub fn current_cell_behavior<'a>(&'a mut self) -> CurrentCellBehavior<'a, R> {
-        CurrentCellBehavior { table: self }
+    pub fn current_cell_behavior<'a, 'b>(
+        &'a mut self,
+        p: &'b mut R::BehaviorContext,
+    ) -> CurrentCellBehavior<'a, 'b, R> {
+        CurrentCellBehavior { table: self, p }
     }
 
     pub fn as_widget<'a>(&'a self) -> TableWidget<'a, R> {
@@ -172,13 +180,14 @@ impl<R: TableRow + 'static> Table<R> {
 }
 
 /// Pass all behavior to the currently active cell.
-pub struct CurrentCellBehavior<'a, R: TableRow + 'static> {
+pub struct CurrentCellBehavior<'a, 'b, R: TableRow + 'static> {
     table: &'a mut Table<R>,
+    p: &'b mut R::BehaviorContext,
 }
 
-impl<'a, R: TableRow + 'static> Behavior for CurrentCellBehavior<'a, R> {
+impl<R: TableRow + 'static> Behavior for CurrentCellBehavior<'_, '_, R> {
     fn input(self, i: Input) -> Option<Input> {
-        self.table.pass_event_to_current_cell(i)
+        self.table.pass_event_to_current_cell(i, self.p)
     }
 }
 
@@ -514,9 +523,10 @@ mod test {
 
     struct TestRow(String);
     impl TableRow for TestRow {
+        type BehaviorContext = ();
         const COLUMNS: &'static [Column<Self>] = &[Column {
             access: |r| Box::new(r.0.as_str()),
-            behavior: |_, _| None,
+            behavior: |_, _, _| None,
         }];
     }
 
