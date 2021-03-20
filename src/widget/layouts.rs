@@ -2,7 +2,7 @@
 use super::{ColDemand, Demand, Demand2D, RenderingHints, RowDemand, Widget};
 use base::basic_types::*;
 use base::{GraphemeCluster, StyleModifier, Window};
-use std::cmp::{min, Ord};
+use std::cmp::Ord;
 use std::fmt::Debug;
 
 /// Compute assigned lengths for the given demands in one dimension of size `available_space`.
@@ -16,162 +16,201 @@ use std::fmt::Debug;
 /// 3. Each demand should be treated equally, but the assigned length shall not exceed the maximum.
 /// 4. All space will be distributed.
 pub fn layout_linearly<T: AxisDimension + Ord + Debug + Clone>(
-    mut available_space: PositiveAxisDiff<T>,
+    available_space: PositiveAxisDiff<T>,
     separator_width: PositiveAxisDiff<T>,
     demands: &[Demand<T>],
 ) -> Box<[PositiveAxisDiff<T>]> {
     //eprintln!("av {}, sep {}, dem, {:?}", available_space, separator_width, demands);
 
-    let mut assigned_spaces =
-        vec![PositiveAxisDiff::new(0).unwrap(); demands.len()].into_boxed_slice();
+    let mut assigned_spaces = vec![0.0; demands.len()].into_boxed_slice();
+
+    let weights = demands.iter().map(|_| 1.0).collect::<Vec<f64>>();
+
+    struct DemandF {
+        min: f64,
+        max: f64,
+    }
+
+    let demands = demands
+        .iter()
+        .map(|d| DemandF {
+            min: d.min.raw_value() as f64,
+            max: d.max.unwrap_or(available_space).raw_value() as f64,
+        })
+        .collect::<Vec<_>>();
 
     // Reserve space for separators
     let diff = available_space - separator_width * demands.len().saturating_sub(1);
     if diff < 0 {
-        return assigned_spaces;
+        return vec![PositiveAxisDiff::new(0).unwrap(); demands.len()].into_boxed_slice();
     }
-    available_space = diff.try_into_positive().unwrap();
 
-    // All are unfinished initially
-    let mut unfulfilled_min = (0..demands.len()).into_iter().collect::<Vec<usize>>();
+    let total = diff.try_into_positive().unwrap().raw_value() as f64;
 
-    // Try to fullfil all min demands fairly
-    while !unfulfilled_min.is_empty() {
-        let num_unfulfilled = unfulfilled_min.len();
-        if available_space == 0 {
-            break;
-        }
-        let equal_budget = available_space / num_unfulfilled;
-        let mut left_over = available_space % num_unfulfilled;
+    // Try to fullfil all min demands fairly according to weight
+    {
+        let mut total_unfinished = total;
+        let mut unfulfilled_min = (0..demands.len()).into_iter().collect::<Vec<usize>>();
 
-        let mut still_unfullfilled = Vec::<usize>::new();
-        for num_unfulfilled_index in unfulfilled_min {
-            let demand = demands[num_unfulfilled_index];
-            let assigned_space = &mut assigned_spaces[num_unfulfilled_index];
+        while !unfulfilled_min.is_empty() {
+            let weight_sum: f64 = unfulfilled_min.iter().map(|i| weights[*i]).sum();
 
-            let budget = if equal_budget > 0 {
-                equal_budget
-            } else {
-                if left_over > 0 {
-                    left_over = (left_over - 1).try_into_positive().unwrap();
-                    PositiveAxisDiff::new(1).unwrap()
+            let mut still_unfullfilled = Vec::<usize>::new();
+            let to_distribute = total_unfinished;
+            for i in &unfulfilled_min {
+                let i = *i;
+
+                let demand = &demands[i];
+                let weight = weights[i];
+                let assigned_space = &mut assigned_spaces[i];
+
+                let budget_coeff: f64 = if weight_sum > 0.0 {
+                    weight / weight_sum
                 } else {
-                    PositiveAxisDiff::new(0).unwrap()
+                    1.0
+                };
+                let budget = to_distribute * budget_coeff;
+
+                let max = demand.min;
+                let space = max.min(budget);
+                *assigned_space = space;
+
+                if *assigned_space < max {
+                    still_unfullfilled.push(i);
+                } else {
+                    total_unfinished -= *assigned_space;
                 }
-            };
-
-            let required_to_min = (demand.min - *assigned_space).positive_or_zero();
-            let additional_space = min(budget, required_to_min);
-            available_space = (available_space - additional_space)
-                .try_into_positive()
-                .unwrap();
-            *assigned_space += additional_space;
-
-            if *assigned_space < demand.min {
-                still_unfullfilled.push(num_unfulfilled_index);
             }
-        }
-        unfulfilled_min = still_unfullfilled;
-    }
-
-    // Collect not completely fulfilled rewards
-    let mut unfinished = (0..demands.len())
-        .into_iter()
-        .filter(|i| {
-            let demand = demands[*i];
-            if let Some(max_demand) = demand.max {
-                if demand.min != max_demand {
-                    return true;
-                }
-            } else {
-                return true;
-            }
-            false
-        })
-        .collect::<Vec<usize>>();
-
-    // equalize remaining
-    loop {
-        unfinished.sort_by(|&i, &j| assigned_spaces[i].cmp(&assigned_spaces[j]));
-        let mut still_unfinished = Vec::<usize>::new();
-
-        if unfinished.is_empty() {
-            return assigned_spaces;
-        }
-
-        let mut planned_to_spend = PositiveAxisDiff::new(0).unwrap();
-        let mut planned_increased_space = PositiveAxisDiff::new(0).unwrap();
-        let mut num_equalized = 0;
-        // Plan to equalize "ladder" as far as possible
-        for (i, unfinished_index) in unfinished.iter().enumerate() {
-            let new_space = assigned_spaces[*unfinished_index];
-            let diff = (new_space - planned_increased_space)
-                .try_into_positive()
-                .expect("Sorted, so >= 0");
-            let increase_cost = diff * i;
-            if planned_to_spend + increase_cost > available_space {
+            if still_unfullfilled.len() == unfulfilled_min.len() {
                 break;
             }
-            num_equalized = i + 1;
-            planned_to_spend += increase_cost;
-            planned_increased_space = new_space;
+            unfulfilled_min = still_unfullfilled;
         }
-        // Plan to distribute the remaining space equally (will be less than the last step on the
-        // ladder!
-        let left_to_spend = (available_space - planned_to_spend)
-            .try_into_positive()
-            .unwrap();
-        let per_widget_increase = left_to_spend / num_equalized;
-        planned_increased_space += per_widget_increase;
+    }
 
-        let min_space = assigned_spaces[unfinished[0]];
-        if min_space == planned_increased_space {
-            break;
-        }
-        debug_assert!(
-            min_space < planned_increased_space,
-            "Invalid planned increase"
-        );
-
-        // Actually distribute (some of) the remaining space like planned
-        for unfinished_index in unfinished {
-            let assigned_space: &mut PositiveAxisDiff<T> = &mut assigned_spaces[unfinished_index];
-            let increase = if let Some(max_demand) = demands[unfinished_index].max {
-                if max_demand > planned_increased_space {
-                    still_unfinished.push(unfinished_index);
-                    (planned_increased_space - *assigned_space).positive_or_zero()
-                } else {
-                    (max_demand - *assigned_space).positive_or_zero()
-                }
+    // Try to fullfil max demands, if not in conflict with min demands
+    {
+        // Collect all widgets that have at least the min demand met so far.
+        let mut total_unfinished = total;
+        let mut unfinished = Vec::new();
+        for i in 0..demands.len() {
+            let demand = &demands[i];
+            let assigned = assigned_spaces[i];
+            if demand.min <= assigned && assigned < demand.max {
+                unfinished.push(i);
             } else {
-                still_unfinished.push(unfinished_index);
-                (planned_increased_space - *assigned_space).positive_or_zero()
-            };
-            *assigned_space += increase;
-            available_space = (available_space - increase).try_into_positive().unwrap();
+                total_unfinished -= assigned;
+            }
         }
 
-        unfinished = still_unfinished;
-    }
+        // Then remove all that would get less than min demand in weighted distribution
+        {
+            let weight_sum: f64 = unfinished.iter().map(|i| weights[*i]).sum();
+            let mut still_unfinished = Vec::<usize>::new();
 
-    for unfinished_index in unfinished {
-        if available_space == 0 {
-            break;
+            let to_distribute = total_unfinished;
+            for i in &unfinished {
+                let i = *i;
+
+                let demand = &demands[i];
+                let weight = weights[i];
+
+                let budget_coeff: f64 = if weight_sum > 0.0 {
+                    weight / weight_sum
+                } else {
+                    1.0
+                };
+                let budget = to_distribute * budget_coeff;
+
+                if budget > demand.min {
+                    still_unfinished.push(i);
+                } else {
+                    total_unfinished -= demand.min;
+                }
+            }
+            unfinished = still_unfinished;
         }
-        debug_assert!(
-            {
-                let demand = demands[unfinished_index];
-                demand.max.is_none() || demand.max.unwrap() > assigned_spaces[unfinished_index]
-            },
-            "Invalid demand for unfinished"
-        );
 
-        assigned_spaces[unfinished_index] += PositiveAxisDiff::new(1).unwrap();
-        available_space = (available_space - 1).try_into_positive().unwrap();
+        // Distribute the remaining space according to weights
+        while !unfinished.is_empty() {
+            let weight_sum: f64 = unfinished.iter().map(|i| weights[*i]).sum();
+
+            let mut still_unfinished = Vec::<usize>::new();
+            let to_distribute = total_unfinished;
+            for i in &unfinished {
+                let i = *i;
+
+                let demand = &demands[i];
+                let weight = weights[i];
+                let assigned_space = &mut assigned_spaces[i];
+
+                let budget_coeff: f64 = if weight_sum > 0.0 {
+                    weight / weight_sum
+                } else {
+                    1.0
+                };
+                let budget = to_distribute * budget_coeff;
+
+                let max = demand.max;
+                let space = max.min(budget);
+                *assigned_space = space;
+
+                if *assigned_space < max {
+                    still_unfinished.push(i);
+                } else {
+                    total_unfinished -= *assigned_space;
+                }
+            }
+            if still_unfinished.len() == unfinished.len() {
+                break;
+            }
+            unfinished = still_unfinished;
+        }
     }
-    debug_assert!(available_space == 0, "Not all space distributed");
 
-    assigned_spaces
+    let mut assigned_int = assigned_spaces
+        .into_iter()
+        .map(|f| PositiveAxisDiff::<T>::new_unchecked(*f as i32))
+        .collect::<Vec<_>>();
+
+    let total_assigned: PositiveAxisDiff<T> = assigned_int.iter().sum();
+    let total_demand: AxisDiff<T> = demands.iter().map(|d| AxisDiff::new(d.max as i32)).sum();
+    let mut still_to_assign = (diff - total_assigned).min(total_demand);
+
+    // Distribute spaces accumulated through rounding errors
+    {
+        // Collect not completely fulfilled rewards
+        let mut unfinished = (0..demands.len())
+            .into_iter()
+            .filter(|i| {
+                let s = &assigned_int[*i];
+                let demand = &demands[*i];
+                s.raw_value() < demand.max as i32
+            })
+            .collect::<Vec<usize>>();
+
+        while !unfinished.is_empty() {
+            let mut still_unfinished = Vec::<usize>::new();
+            for i in unfinished {
+                if still_to_assign == 0 {
+                    break;
+                }
+
+                let demand = &demands[i];
+                let s = &mut assigned_int[i];
+
+                *s += 1;
+                still_to_assign -= 1;
+
+                if s.raw_value() < demand.max as i32 {
+                    still_unfinished.push(i);
+                }
+            }
+            unfinished = still_unfinished;
+        }
+    }
+
+    assigned_int.into_boxed_slice()
 }
 
 /// Draw the widgets in the given window in a linear layout.
@@ -433,6 +472,7 @@ mod test {
         }
     }
 
+    #[track_caller]
     fn assert_eq_boxed_slices(b1: Box<[Width]>, b2: Box<[i32]>, description: &str) {
         let b2 = b2
             .iter()
@@ -648,6 +688,7 @@ mod test {
         );
     }
 
+    #[track_caller]
     fn aeq_horizontal_layout_space_demand(
         widgets: Vec<FakeWidget>,
         solution: (ColDemand, RowDemand),
@@ -686,6 +727,7 @@ mod test {
             (Demand::at_least(4), Demand::at_least(5)),
         );
     }
+    #[track_caller]
     fn aeq_horizontal_layout_draw(
         terminal_size: (u32, u32),
         widgets: Vec<FakeWidget>,
@@ -699,7 +741,8 @@ mod test {
         layout.draw(term.create_root_window(), RenderingHints::default());
         assert_eq!(
             term,
-            FakeTerminal::from_str(terminal_size, solution).expect("term from str")
+            FakeTerminal::from_str(terminal_size, solution).expect("term from str"),
+            "got <=> expected"
         );
     }
     #[test]
@@ -738,6 +781,7 @@ mod test {
         );
     }
 
+    #[track_caller]
     fn aeq_vertical_layout_space_demand(
         widgets: Vec<FakeWidget>,
         solution: (ColDemand, RowDemand),
@@ -776,6 +820,7 @@ mod test {
             (Demand::at_least(5), Demand::at_least(4)),
         );
     }
+    #[track_caller]
     fn aeq_vertical_layout_draw(
         terminal_size: (u32, u32),
         widgets: Vec<FakeWidget>,

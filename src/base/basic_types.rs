@@ -473,6 +473,16 @@ impl<T: AxisDimension + PartialOrd + Ord> Sum for PositiveAxisDiff<T> {
         iter.fold(PositiveAxisDiff::new_unchecked(0), PositiveAxisDiff::add)
     }
 }
+impl<'a, T: 'a + AxisDimension + PartialOrd + Ord> Sum<&'a PositiveAxisDiff<T>>
+    for PositiveAxisDiff<T>
+{
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = &'a Self>,
+    {
+        iter.into_iter().map(|i| *i).sum()
+    }
+}
 impl<T: AxisDimension> From<usize> for PositiveAxisDiff<T> {
     fn from(v: usize) -> Self {
         assert!(
@@ -480,6 +490,22 @@ impl<T: AxisDimension> From<usize> for PositiveAxisDiff<T> {
             "Invalid PositiveAxisDiff value"
         );
         PositiveAxisDiff::new_unchecked(v as i32)
+    }
+}
+impl<T: AxisDimension + PartialOrd + Ord> Sum for AxisDiff<T> {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Self>,
+    {
+        iter.fold(AxisDiff::new(0), AxisDiff::add)
+    }
+}
+impl<'a, T: 'a + AxisDimension + PartialOrd + Ord> Sum<&'a AxisDiff<T>> for AxisDiff<T> {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = &'a Self>,
+    {
+        iter.into_iter().map(|i| *i).sum()
     }
 }
 
