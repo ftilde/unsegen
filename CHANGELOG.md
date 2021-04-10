@@ -8,6 +8,7 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 - Add `Centered` widget wrapper, which centers a widget with a smaller max size than the window.
 - Implement `PromptLine` search functionality.
 - Add `chain_and_then`, `if_consumed` and `if_not_consumed` methods to `InputChain` for handling side effects.
+- Add `set_layout` method to change the layout of an existing `ContainerManager`.
 ### Changed
 - Change `Widget` semantics to be short-lived.
 - Replace `{Horizontal,Vertical}Layout` with `{H,V}Layout` which are short-lived and implement Widget. [BC]

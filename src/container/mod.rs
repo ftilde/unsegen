@@ -671,6 +671,13 @@ impl<'a, C: ContainerProvider> ContainerManager<'a, C> {
         }
     }
 
+    /// Change the `Layout` of the `ContainerManager` to the given one. This will also reset to
+    /// active container to the default one.
+    pub fn set_layout(&mut self, layout_root: Box<dyn Layout<C> + 'a>) {
+        self.layout = layout_root;
+        self.active = C::DEFAULT_CONTAINER.clone();
+    }
+
     /// Draw all containers and separating lines onto the provided window.
     ///
     /// Use `border_style` to change how the lines will be drawn.
