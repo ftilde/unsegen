@@ -19,12 +19,12 @@ pub fn layout_linearly<T: AxisDimension + Ord + Debug + Clone>(
     available_space: PositiveAxisDiff<T>,
     separator_width: PositiveAxisDiff<T>,
     demands: &[Demand<T>],
+    weights: &[f64],
 ) -> Box<[PositiveAxisDiff<T>]> {
     //eprintln!("av {}, sep {}, dem, {:?}", available_space, separator_width, demands);
+    assert_eq!(demands.len(), weights.len());
 
     let mut assigned_spaces = vec![0.0; demands.len()].into_boxed_slice();
-
-    let weights = demands.iter().map(|_| 1.0).collect::<Vec<f64>>();
 
     struct DemandF {
         min: f64,
@@ -214,9 +214,11 @@ pub fn layout_linearly<T: AxisDimension + Ord + Debug + Clone>(
 }
 
 /// Draw the widgets in the given window in a linear layout.
-fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
+fn draw_linearly<'a, T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
     window: Window,
-    widgets: &[(&dyn Widget, RenderingHints)],
+    widgets: &[Box<dyn Widget + 'a>],
+    weights: &[f64],
+    rendering_hints: &[RenderingHints],
     separating_style: &SeparatingStyle,
     split: S,
     window_length: L,
@@ -228,13 +230,19 @@ fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
     M: Fn(&SeparatingStyle) -> PositiveAxisDiff<T>,
     D: Fn(Demand2D) -> Demand<T>,
 {
+    assert_eq!(widgets.len(), weights.len());
+    assert_eq!(widgets.len(), rendering_hints.len());
     let separator_length = separator_length(separating_style);
     let demands: Vec<Demand<T>> = widgets
         .iter()
-        .map(|&(ref w, _)| demand_dimension(w.space_demand()))
+        .map(|w| demand_dimension(w.space_demand()))
         .collect();
-    let assigned_spaces =
-        layout_linearly(window_length(&window), separator_length, demands.as_slice());
+    let assigned_spaces = layout_linearly(
+        window_length(&window),
+        separator_length,
+        demands.as_slice(),
+        weights,
+    );
 
     debug_assert!(
         widgets.len() == assigned_spaces.len(),
@@ -244,17 +252,18 @@ fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
     let mut rest_window = window;
     let mut iter = widgets
         .iter()
+        .zip(rendering_hints.iter())
         .zip(assigned_spaces.iter())
         .enumerate()
         .peekable();
-    while let Some((i, (&(ref w, hint), &pos))) = iter.next() {
+    while let Some((i, ((w, hint), &pos))) = iter.next() {
         let (mut window, r) = split(rest_window, pos.from_origin());
         rest_window = r;
         if let (1, &SeparatingStyle::AlternatingStyle(modifier)) = (i % 2, separating_style) {
             window.modify_default_style(modifier);
         }
         window.clear(); // Fill background using new style
-        w.draw(window, hint);
+        w.draw(window, *hint);
         if let (Some(_), &SeparatingStyle::Draw(ref c)) = (iter.peek(), separating_style) {
             if window_length(&rest_window) > 0 {
                 let (mut window, r) = split(rest_window, separator_length.from_origin());
@@ -268,6 +277,7 @@ fn draw_linearly<T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
 pub struct HLayout<'a> {
     separating_style: SeparatingStyle,
     widgets: Vec<Box<dyn Widget + 'a>>,
+    weights: Vec<f64>,
 }
 
 impl<'a> HLayout<'a> {
@@ -275,6 +285,7 @@ impl<'a> HLayout<'a> {
         HLayout {
             separating_style: SeparatingStyle::None,
             widgets: Vec::new(),
+            weights: Vec::new(),
         }
     }
 
@@ -291,8 +302,13 @@ impl<'a> HLayout<'a> {
         self
     }
 
-    pub fn widget<W: Widget + 'a>(mut self, t: W) -> Self {
+    pub fn widget<W: Widget + 'a>(self, t: W) -> Self {
+        self.widget_weighted(t, 1.0)
+    }
+
+    pub fn widget_weighted<W: Widget + 'a>(mut self, t: W, weight: f64) -> Self {
         self.widgets.push(Box::new(t));
+        self.weights.push(weight);
         self
     }
 }
@@ -317,14 +333,14 @@ impl<'a> Widget for HLayout<'a> {
         }
     }
     fn draw(&self, window: Window, hints: RenderingHints) {
-        let widgets = self
-            .widgets
-            .iter()
-            .map(|w| (&**w, hints))
+        let hints = std::iter::repeat(hints)
+            .take(self.widgets.len())
             .collect::<Vec<_>>();
         draw_linearly(
             window,
-            &widgets[..],
+            &self.widgets,
+            &self.weights,
+            &hints,
             &self.separating_style,
             |w, p| w.split(p).expect("valid split pos"),
             |w| w.get_width(),
@@ -337,6 +353,7 @@ impl<'a> Widget for HLayout<'a> {
 pub struct VLayout<'a> {
     separating_style: SeparatingStyle,
     widgets: Vec<Box<dyn Widget + 'a>>,
+    weights: Vec<f64>,
 }
 
 impl<'a> VLayout<'a> {
@@ -344,6 +361,7 @@ impl<'a> VLayout<'a> {
         VLayout {
             separating_style: SeparatingStyle::None,
             widgets: Vec::new(),
+            weights: Vec::new(),
         }
     }
 
@@ -360,8 +378,13 @@ impl<'a> VLayout<'a> {
         self
     }
 
-    pub fn widget<W: Widget + 'a>(mut self, t: W) -> Self {
+    pub fn widget<W: Widget + 'a>(self, t: W) -> Self {
+        self.widget_weighted(t, 1.0)
+    }
+
+    pub fn widget_weighted<W: Widget + 'a>(mut self, t: W, weight: f64) -> Self {
         self.widgets.push(Box::new(t));
+        self.weights.push(weight);
         self
     }
 }
@@ -388,14 +411,14 @@ impl<'a> Widget for VLayout<'a> {
 
     /// Draw the given widgets to the window, from top to bottom.
     fn draw(&self, window: Window, hints: RenderingHints) {
-        let widgets = self
-            .widgets
-            .iter()
-            .map(|w| (&**w, hints))
+        let hints = std::iter::repeat(hints)
+            .take(self.widgets.len())
             .collect::<Vec<_>>();
         draw_linearly(
             window,
-            &widgets[..],
+            &self.widgets,
+            &self.weights,
+            &hints,
             &self.separating_style,
             |w, p| w.split(p).expect("valid split pos"),
             |w| w.get_height(),
@@ -486,54 +509,143 @@ mod test {
         Width::new(i).unwrap()
     }
 
+    fn ll_unweighted<T: AxisDimension + Ord + Debug + Clone>(
+        available_space: PositiveAxisDiff<T>,
+        separator_width: PositiveAxisDiff<T>,
+        demands: &[Demand<T>],
+    ) -> Box<[PositiveAxisDiff<T>]> {
+        let weights = std::iter::repeat(1.0)
+            .take(demands.len())
+            .collect::<Vec<_>>();
+        layout_linearly(available_space, separator_width, demands, &weights)
+    }
+
     #[test]
     fn test_layout_linearly_exact() {
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::exact(1), Demand::exact(2)]),
+            ll_unweighted(w(4), w(0), &[Demand::exact(1), Demand::exact(2)]),
             Box::new([1, 2]),
             "some left",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::exact(1), Demand::exact(3)]),
+            ll_unweighted(w(4), w(0), &[Demand::exact(1), Demand::exact(3)]),
             Box::new([1, 3]),
             "exact",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::exact(2), Demand::exact(3)]),
+            ll_unweighted(w(4), w(0), &[Demand::exact(2), Demand::exact(3)]),
             Box::new([2, 2]),
             "less for 2nd",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::exact(5), Demand::exact(3)]),
+            ll_unweighted(w(4), w(0), &[Demand::exact(5), Demand::exact(3)]),
             Box::new([2, 2]),
             "not enough for min",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(5), w(0), &[Demand::exact(5), Demand::exact(3)]),
+            ll_unweighted(w(5), w(0), &[Demand::exact(5), Demand::exact(3)]),
             Box::new([3, 2]),
             "not enough for min unequal",
         );
     }
 
     #[test]
+    fn test_layout_linearly_weighted_less_than_min() {
+        assert_eq_boxed_slices(
+            layout_linearly(
+                w(4),
+                w(0),
+                &[Demand::at_least(3), Demand::at_least(5)],
+                &[1.0, 1.0],
+            ),
+            Box::new([2, 2]),
+            "equal",
+        );
+        assert_eq_boxed_slices(
+            layout_linearly(
+                w(10),
+                w(0),
+                &[Demand::at_least(3), Demand::at_least(5)],
+                &[2.0, 3.0],
+            ),
+            Box::new([4, 6]),
+            "uneven",
+        );
+        assert_eq_boxed_slices(
+            layout_linearly(
+                w(4),
+                w(0),
+                &[Demand::at_least(3), Demand::at_least(5)],
+                &[0.0, 1.0],
+            ),
+            Box::new([0, 4]),
+            "one zero",
+        );
+        assert_eq_boxed_slices(
+            layout_linearly(
+                w(6),
+                w(0),
+                &[Demand::at_least(3), Demand::at_least(5)],
+                &[0.0, 1.0],
+            ),
+            Box::new([1, 5]),
+            "one zero, partially fulfilled",
+        );
+    }
+
+    #[test]
+    fn test_layout_linearly_weighted_between_min_max() {
+        assert_eq_boxed_slices(
+            layout_linearly(
+                w(4),
+                w(0),
+                &[Demand::from_to(1, 5), Demand::from_to(1, 4)],
+                &[1.0, 1.0],
+            ),
+            Box::new([2, 2]),
+            "equal",
+        );
+        assert_eq_boxed_slices(
+            layout_linearly(
+                w(10),
+                w(0),
+                &[Demand::from_to(1, 10), Demand::from_to(1, 10)],
+                &[3.0, 2.0],
+            ),
+            Box::new([6, 4]),
+            "uneven",
+        );
+        assert_eq_boxed_slices(
+            layout_linearly(
+                w(5),
+                w(0),
+                &[Demand::from_to(1, 10), Demand::from_to(1, 10)],
+                &[0.0, 1.0],
+            ),
+            Box::new([1, 4]),
+            "one zero",
+        );
+    }
+
+    #[test]
     fn test_layout_linearly_from_to() {
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::from_to(1, 2), Demand::from_to(1, 2)]),
+            ll_unweighted(w(4), w(0), &[Demand::from_to(1, 2), Demand::from_to(1, 2)]),
             Box::new([2, 2]),
             "both hit max",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::from_to(1, 2), Demand::from_to(1, 3)]),
+            ll_unweighted(w(4), w(0), &[Demand::from_to(1, 2), Demand::from_to(1, 3)]),
             Box::new([2, 2]),
             "less for 2nd",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::from_to(5, 6), Demand::from_to(1, 4)]),
+            ll_unweighted(w(4), w(0), &[Demand::from_to(5, 6), Demand::from_to(1, 4)]),
             Box::new([3, 1]),
             "not enough for min of first",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::from_to(1, 5), Demand::from_to(1, 4)]),
+            ll_unweighted(w(4), w(0), &[Demand::from_to(1, 5), Demand::from_to(1, 4)]),
             Box::new([2, 2]),
             "both not full",
         );
@@ -542,27 +654,27 @@ mod test {
     #[test]
     fn test_layout_linearly_from_at_least() {
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::at_least(1), Demand::at_least(1)]),
+            ll_unweighted(w(4), w(0), &[Demand::at_least(1), Demand::at_least(1)]),
             Box::new([2, 2]),
             "more for both",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::at_least(1), Demand::at_least(2)]),
+            ll_unweighted(w(4), w(0), &[Demand::at_least(1), Demand::at_least(2)]),
             Box::new([2, 2]),
             "more for 1st, exact for 2nd",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::at_least(2), Demand::at_least(2)]),
+            ll_unweighted(w(4), w(0), &[Demand::at_least(2), Demand::at_least(2)]),
             Box::new([2, 2]),
             "exact for both",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(4), w(0), &[Demand::at_least(5), Demand::at_least(2)]),
+            ll_unweighted(w(4), w(0), &[Demand::at_least(5), Demand::at_least(2)]),
             Box::new([2, 2]),
             "not enough for min",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(5), w(0), &[Demand::at_least(5), Demand::at_least(2)]),
+            ll_unweighted(w(5), w(0), &[Demand::at_least(5), Demand::at_least(2)]),
             Box::new([3, 2]),
             "not enough for min unequal",
         );
@@ -571,22 +683,22 @@ mod test {
     #[test]
     fn test_layout_linearly_mixed() {
         assert_eq_boxed_slices(
-            layout_linearly(w(10), w(0), &[Demand::exact(3), Demand::at_least(1)]),
+            ll_unweighted(w(10), w(0), &[Demand::exact(3), Demand::at_least(1)]),
             Box::new([3, 7]),
             "exact, 2nd takes rest, no separator",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(10), w(1), &[Demand::exact(3), Demand::at_least(1)]),
+            ll_unweighted(w(10), w(1), &[Demand::exact(3), Demand::at_least(1)]),
             Box::new([3, 6]),
             "exact, 2nd takes rest, separator",
         );
         assert_eq_boxed_slices(
-            layout_linearly(w(10), w(0), &[Demand::from_to(1, 2), Demand::at_least(1)]),
+            ll_unweighted(w(10), w(0), &[Demand::from_to(1, 2), Demand::at_least(1)]),
             Box::new([2, 8]),
             "from_to, 2nd takes rest",
         );
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[Demand::from_to(1, 2), Demand::exact(3), Demand::at_least(1)],
@@ -595,7 +707,7 @@ mod test {
             "misc 1",
         );
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[Demand::from_to(5, 6), Demand::exact(5), Demand::at_least(5)],
@@ -604,7 +716,7 @@ mod test {
             "misc 2",
         );
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[Demand::from_to(4, 6), Demand::exact(4), Demand::at_least(3)],
@@ -613,7 +725,7 @@ mod test {
             "misc 3",
         );
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[Demand::from_to(3, 6), Demand::exact(4), Demand::at_least(3)],
@@ -622,7 +734,7 @@ mod test {
             "misc 4",
         );
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[Demand::from_to(3, 6), Demand::exact(3), Demand::at_least(3)],
@@ -631,7 +743,7 @@ mod test {
             "misc 5",
         );
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[Demand::from_to(2, 4), Demand::exact(2), Demand::at_least(3)],
@@ -640,7 +752,7 @@ mod test {
             "misc 6",
         );
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[Demand::from_to(2, 4), Demand::exact(2), Demand::exact(3)],
@@ -649,7 +761,7 @@ mod test {
             "misc 7",
         );
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[Demand::from_to(2, 4), Demand::exact(2), Demand::at_least(4)],
@@ -658,7 +770,7 @@ mod test {
             "misc 8",
         );
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[
@@ -672,13 +784,13 @@ mod test {
         );
 
         assert_eq_boxed_slices(
-            layout_linearly(w(82), w(1), &[Demand::at_least(4), Demand::at_least(51)]),
+            ll_unweighted(w(82), w(1), &[Demand::at_least(4), Demand::at_least(51)]),
             Box::new([30, 51]),
             "misc 10",
         );
 
         assert_eq_boxed_slices(
-            layout_linearly(
+            ll_unweighted(
                 w(10),
                 w(0),
                 &[Demand::from_to(6, 6), Demand::exact(4), Demand::at_least(2)],
@@ -883,6 +995,7 @@ mod test {
         let mut rng = rand::thread_rng();
         for _ in 0..fuzz_iterations {
             let mut demands = Vec::new();
+            let mut weights = Vec::new();
             for _ in 0..max_widgets {
                 let min = w(rng.gen_range(0, max_space));
                 let demand = if rng.gen() {
@@ -891,11 +1004,12 @@ mod test {
                     Demand::at_least(min)
                 };
                 demands.push(demand);
+                weights.push(rng.gen_range(0.0, 1.0));
             }
 
             let space = rng.gen_range(0, max_space);
             let separator_size = rng.gen_range(0, max_separator_size);
-            let layout = layout_linearly(w(space), w(separator_size), demands.as_slice());
+            let layout = layout_linearly(w(space), w(separator_size), demands.as_slice(), &weights);
 
             let separator_space = (demands.len() as i32 - 1) * separator_size;
 

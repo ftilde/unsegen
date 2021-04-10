@@ -81,8 +81,8 @@
 //!         right: Pager::new(),
 //!     };
 //!     let mut manager = ContainerManager::<App>::from_layout(Box::new(VSplit::new(vec![
-//!         Box::new(Leaf::new(Index::Left)),
-//!         Box::new(Leaf::new(Index::Right)),
+//!         (Box::new(Leaf::new(Index::Left)), 0.8),
+//!         (Box::new(Leaf::new(Index::Right)), 0.2),
 //!     ])));
 //!     let mut term = Terminal::new(stdout.lock()).unwrap();
 //!
@@ -379,14 +379,24 @@ impl<C: ContainerProvider> Layout<C> for Leaf<C> {
 /// A `Layout` laying out all children horizontally, separated by vertical lines.
 pub struct HSplit<'a, C: ContainerProvider> {
     elms: Vec<Box<dyn Layout<C> + 'a>>,
+    weights: Vec<f64>,
 }
 
 impl<'a, C: ContainerProvider> HSplit<'a, C> {
-    /// Create a `HSplit` from its children.
+    /// Create a `HSplit` from its children, each with a specified weight that is used to
+    /// distribute available (horizontal) space.
     ///
     /// The order of children defines the drawing order from left to right.
-    pub fn new(elms: Vec<Box<dyn Layout<C> + 'a>>) -> Self {
-        HSplit { elms: elms }
+    pub fn new(elms: Vec<(Box<dyn Layout<C> + 'a>, f64)>) -> Self {
+        let mut res = HSplit {
+            elms: Vec::new(),
+            weights: Vec::new(),
+        };
+        for (e, w) in elms {
+            res.elms.push(e);
+            res.weights.push(w);
+        }
+        res
     }
 }
 
@@ -416,6 +426,7 @@ impl<'a, C: ContainerProvider> Layout<C> for HSplit<'a, C> {
             available_area.width(),
             separator_length,
             horizontal_demands.as_slice(),
+            self.weights.as_slice(),
         );
         let mut output = LayoutOutput::new();
         let mut p = available_area.x_range.start;
@@ -438,14 +449,24 @@ impl<'a, C: ContainerProvider> Layout<C> for HSplit<'a, C> {
 /// A `Layout` laying out all children vertically, separated by Horizontal lines.
 pub struct VSplit<'a, C: ContainerProvider> {
     elms: Vec<Box<dyn Layout<C> + 'a>>,
+    weights: Vec<f64>,
 }
 
 impl<'a, C: ContainerProvider> VSplit<'a, C> {
-    /// Create a `VSplit` from its children.
+    /// Create a `VSplit` from its children, each with a specified weight that is used to
+    /// distribute available (vertical) space.
     ///
     /// The order of children defines the drawing order from top to bottom.
-    pub fn new(elms: Vec<Box<dyn Layout<C> + 'a>>) -> Self {
-        VSplit { elms: elms }
+    pub fn new(elms: Vec<(Box<dyn Layout<C> + 'a>, f64)>) -> Self {
+        let mut res = VSplit {
+            elms: Vec::new(),
+            weights: Vec::new(),
+        };
+        for (e, w) in elms {
+            res.elms.push(e);
+            res.weights.push(w);
+        }
+        res
     }
 }
 
@@ -475,6 +496,7 @@ impl<'a, C: ContainerProvider> Layout<C> for VSplit<'a, C> {
             available_area.height(),
             separator_length,
             vertical_demands.as_slice(),
+            self.weights.as_slice(),
         );
         let mut output = LayoutOutput::new();
         let mut p = available_area.y_range.start;

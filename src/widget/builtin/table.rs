@@ -229,7 +229,10 @@ impl<'a, R: TableRow + 'static> TableWidget<'a, R> {
             }
         }
         let separator_width = self.col_sep_style.width();
-        layout_linearly(window.get_width(), separator_width, &x_demands)
+        let weights = std::iter::repeat(1.0)
+            .take(x_demands.len())
+            .collect::<Vec<f64>>();
+        layout_linearly(window.get_width(), separator_width, &x_demands, &weights)
     }
 
     fn draw_row<'w>(
