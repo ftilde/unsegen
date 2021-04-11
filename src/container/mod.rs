@@ -139,7 +139,7 @@ pub trait Container<P: ?Sized> {
 /// choice for an Index is therefore an enum.
 pub trait ContainerProvider {
     type Parameters;
-    type Index: Clone + PartialEq;
+    type Index: Clone + PartialEq + std::fmt::Debug;
     fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b dyn Container<Self::Parameters>;
     fn get_mut<'a, 'b: 'a>(
         &'b mut self,
@@ -290,7 +290,7 @@ impl From<VerticalLine> for Line {
 }
 
 /// A Layouter managing screen real estate for multiple containers
-pub trait Layout<C: ContainerProvider> {
+pub trait Layout<C: ContainerProvider>: std::fmt::Debug {
     /// Calculate the space demand required for all of the provided containers
     fn space_demand(&self, containers: &C) -> Demand2D;
     /// Specify how the provided containers should be layed out in the provided area, and how they
@@ -360,6 +360,12 @@ impl<C: ContainerProvider> Leaf<C> {
     }
 }
 
+impl<C: ContainerProvider> std::fmt::Debug for Leaf<C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.container_index)
+    }
+}
+
 impl<C: ContainerProvider> Layout<C> for Leaf<C> {
     fn space_demand(&self, containers: &C) -> Demand2D {
         containers
@@ -397,6 +403,24 @@ impl<'a, C: ContainerProvider> HSplit<'a, C> {
             res.weights.push(w);
         }
         res
+    }
+}
+
+impl<'a, C: ContainerProvider> std::fmt::Debug for HSplit<'a, C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(")?;
+        let mut objs = self.elms.iter().zip(self.weights.iter()).peekable();
+        loop {
+            if let Some((e, w)) = objs.next() {
+                write!(f, "{}{:?}", w, e)?;
+            }
+            if objs.peek().is_some() {
+                write!(f, "|")?;
+            } else {
+                break;
+            }
+        }
+        write!(f, ")")
     }
 }
 
@@ -467,6 +491,24 @@ impl<'a, C: ContainerProvider> VSplit<'a, C> {
             res.weights.push(w);
         }
         res
+    }
+}
+
+impl<'a, C: ContainerProvider> std::fmt::Debug for VSplit<'a, C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(")?;
+        let mut objs = self.elms.iter().zip(self.weights.iter()).peekable();
+        loop {
+            if let Some((e, w)) = objs.next() {
+                write!(f, "{}{:?}", w, e)?;
+            }
+            if objs.peek().is_some() {
+                write!(f, "-")?;
+            } else {
+                break;
+            }
+        }
+        write!(f, ")")
     }
 }
 

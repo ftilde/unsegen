@@ -16,6 +16,7 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 - Add `BehaviorContext` to `TableRow` trait. This allows passing parameters to the `behavior` of a column. [BC]
 - Make `layout_linearly` take `weights` parameter. [BC]
 - Require weights for nodes in `HSplit` and `VSplit`. [BC]
+- `ContainerProvider::Index` and `Layout` must now implement `std::fmt::Debug`. [BC]
 
 ## [0.2.5] - 2020-11-14
 ### Fixed
