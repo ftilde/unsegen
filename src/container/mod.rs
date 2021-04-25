@@ -51,9 +51,9 @@
 //! }
 //!
 //! impl ContainerProvider for App {
-//!     type Parameters = ();
+//!     type Context = ();
 //!     type Index = Index;
-//!     fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b dyn Container<Self::Parameters> {
+//!     fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b dyn Container<Self::Context> {
 //!         match index {
 //!             Index::Left => &self.left,
 //!             Index::Right => &self.right,
@@ -62,7 +62,7 @@
 //!     fn get_mut<'a, 'b: 'a>(
 //!         &'b mut self,
 //!         index: &'a Self::Index,
-//!     ) -> &'b mut dyn Container<Self::Parameters> {
+//!     ) -> &'b mut dyn Container<Self::Context> {
 //!         match index {
 //!             Index::Left => &mut self.left,
 //!             Index::Right => &mut self.right,
@@ -126,9 +126,9 @@ use widget::layouts::layout_linearly;
 use widget::{ColDemand, Demand2D, RenderingHints, RowDemand, Widget};
 
 /// Extension to the widget trait to enable passing input to (active) widgets.
-/// The parameter P can be used to manipulate global application state.
-pub trait Container<P: ?Sized> {
-    fn input(&mut self, input: Input, parameters: &mut P) -> Option<Input>;
+/// The parameter C (i.e., the context) can be used to manipulate global application state.
+pub trait Container<C: ?Sized> {
+    fn input(&mut self, input: Input, context: &mut C) -> Option<Input>;
     fn as_widget<'a>(&'a self) -> Box<dyn Widget + 'a>;
 }
 
@@ -138,24 +138,24 @@ pub trait Container<P: ?Sized> {
 /// Note that every possible value for `Self::Index` must correspond to a valid component. A good
 /// choice for an Index is therefore an enum.
 pub trait ContainerProvider {
-    type Parameters;
+    type Context;
     type Index: Clone + PartialEq + std::fmt::Debug;
-    fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b dyn Container<Self::Parameters>;
+    fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b dyn Container<Self::Context>;
     fn get_mut<'a, 'b: 'a>(
         &'b mut self,
         index: &'a Self::Index,
-    ) -> &'b mut dyn Container<Self::Parameters>;
+    ) -> &'b mut dyn Container<Self::Context>;
     const DEFAULT_CONTAINER: Self::Index;
 }
 
 /// A `Behavior` which can be used to pass input to the currently active container.
 pub struct ActiveContainerBehavior<'a, 'b, 'c, 'd: 'a, C: ContainerProvider + 'a + 'b>
 where
-    C::Parameters: 'c,
+    C::Context: 'c,
 {
     manager: &'a mut ContainerManager<'d, C>,
     provider: &'b mut C,
-    parameters: &'c mut C::Parameters,
+    context: &'c mut C::Context,
 }
 
 /// Pass input on to the currently active container.
@@ -166,7 +166,7 @@ impl<'a, 'b, 'c, 'd: 'a, C: ContainerProvider + 'a + 'b> Behavior
         i.chain(|i| {
             self.provider
                 .get_mut(&self.manager.active)
-                .input(i, self.parameters)
+                .input(i, self.context)
         })
         .finish()
     }
@@ -830,12 +830,12 @@ impl<'a, C: ContainerProvider> ContainerManager<'a, C> {
     pub fn active_container_behavior<'b, 'c, 'd>(
         &'b mut self,
         provider: &'c mut C,
-        parameters: &'d mut C::Parameters,
+        context: &'d mut C::Context,
     ) -> ActiveContainerBehavior<'b, 'c, 'd, 'a, C> {
         ActiveContainerBehavior {
             manager: self,
-            provider: provider,
-            parameters: parameters,
+            provider,
+            context,
         }
     }
 
