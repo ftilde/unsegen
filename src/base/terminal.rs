@@ -199,6 +199,7 @@ impl<'a, T: Write + AsRawFd> Drop for Terminal<'a, T> {
     }
 }
 
+/// Contains a FakeTerminal useful for tests
 pub mod test {
     use super::super::{
         GraphemeCluster, Height, Style, StyleModifier, StyledGraphemeCluster, Width, Window,

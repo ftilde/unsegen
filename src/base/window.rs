@@ -9,6 +9,7 @@ use std::ops::{Bound, RangeBounds};
 
 /// A GraphemeCluster with an associated style.
 #[derive(Clone, Debug, PartialEq)]
+#[allow(missing_docs)]
 pub struct StyledGraphemeCluster {
     pub grapheme_cluster: GraphemeCluster,
     pub style: Style,

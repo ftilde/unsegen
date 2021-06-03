@@ -5,7 +5,7 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 ## [0.3.0] - UNRELEASED
 ### Added
 - Implement `Widget` for strings (for `Borrow<str>`).
-- Add `Centered` widget wrapper, which centers a widget with a smaller max size than the window.
+- Add `WidgetExt` with some convenience methods to change Widget behavior.
 - Implement `PromptLine` search functionality.
 - Add `chain_and_then`, `if_consumed` and `if_not_consumed` methods to `InputChain` for handling side effects.
 - Add `set_layout` method to change the layout of an existing `ContainerManager`.

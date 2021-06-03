@@ -9,6 +9,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 /// Defines how a cursor behaves when arriving at the right-hand border of the CursorTarget.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(missing_docs)]
 pub enum WrappingMode {
     Wrap,
     NoWrap,
@@ -108,19 +109,24 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self.state
     }
 
+    /// Change the position of the cursor on the terminal/window grid. Consumes, changes and
+    /// returns to cursor, so it is useful for initialization.
     pub fn position(mut self, x: ColIndex, y: RowIndex) -> Self {
         self.move_to(x, y);
         self
     }
 
+    /// Get the position of the cursor on the terminal/window grid.
     pub fn get_position(&self) -> (ColIndex, RowIndex) {
         (self.state.x, self.state.y)
     }
 
+    /// Get the current column position on the terminal/window grid.
     pub fn get_col(&self) -> ColIndex {
         self.state.x
     }
 
+    /// Get the current row position on the terminal/window grid.
     pub fn get_row(&self) -> RowIndex {
         self.state.y
     }
@@ -144,15 +150,18 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self.state.y += y;
     }
 
+    /// Change the position of the cursor on the terminal/window grid.
     pub fn move_to(&mut self, x: ColIndex, y: RowIndex) {
         self.state.x = x;
         self.state.y = y;
     }
 
+    /// Change the column position of the cursor on the terminal/window grid.
     pub fn move_to_x(&mut self, x: ColIndex) {
         self.state.x = x;
     }
 
+    /// Change the column position of the cursor on the terminal/window grid.
     pub fn move_to_y(&mut self, y: RowIndex) {
         self.state.y = y;
     }
@@ -207,10 +216,13 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         }
     }
 
+    /// Change the wrapping mode of the cursor (i.e., either changing to a new line or writing
+    /// outside of the window).
     pub fn set_wrapping_mode(&mut self, wm: WrappingMode) {
         self.state.wrapping_mode = wm;
     }
 
+    /// Read the current wrapping mode of the cursor.
     pub fn wrapping_mode(mut self, wm: WrappingMode) -> Self {
         self.set_wrapping_mode(wm);
         self
@@ -244,6 +256,11 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self
     }
 
+    /// Change the column to which to cursor will jump automatically when wrapping at the end.
+    /// Furthermore, when moving left, the cursor will wrap upwards if crossing over the start
+    /// column.
+    ///
+    /// The default value is, of course, 0.
     pub fn set_line_start_column(&mut self, column: ColIndex) {
         self.state.line_start_column = column;
     }
@@ -260,10 +277,13 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self
     }
 
+    /// Change the style modifier that will be used when writing cells to the target.  The modifier
+    /// will be applied to the base style of the target before writing to a cell.
     pub fn set_style_modifier(&mut self, style_modifier: StyleModifier) {
         self.state.style_modifier = style_modifier;
     }
 
+    /// Read the current StyleModifier.
     pub fn get_style_modifier(&mut self) -> StyleModifier {
         self.state.style_modifier
     }
@@ -594,6 +614,7 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         }
     }
 
+    /// Write the given text and wrap the line
     pub fn writeln(&mut self, text: &str) {
         self.write(text);
         self.wrap_line();

@@ -39,7 +39,7 @@
 //!     }
 //! }
 //!
-//! #[derive(Clone, PartialEq)]
+//! #[derive(Clone, PartialEq, Debug)]
 //! enum Index {
 //!     Left,
 //!     Right,
@@ -128,7 +128,9 @@ use widget::{ColDemand, Demand2D, RenderingHints, RowDemand, Widget};
 /// Extension to the widget trait to enable passing input to (active) widgets.
 /// The parameter C (i.e., the context) can be used to manipulate global application state.
 pub trait Container<C: ?Sized> {
+    /// Receive, process and possibly consume the input.
     fn input(&mut self, input: Input, context: &mut C) -> Option<Input>;
+    /// Prepare for drawing to a window.
     fn as_widget<'a>(&'a self) -> Box<dyn Widget + 'a>;
 }
 
@@ -138,13 +140,18 @@ pub trait Container<C: ?Sized> {
 /// Note that every possible value for `Self::Index` must correspond to a valid component. A good
 /// choice for an Index is therefore an enum.
 pub trait ContainerProvider {
+    /// Type to be passed as a parameter to `Container::input`.
     type Context;
+    /// Type that enumerates and identifies all containers.
     type Index: Clone + PartialEq + std::fmt::Debug;
+    /// Get the container identified by the index.
     fn get<'a, 'b: 'a>(&'b self, index: &'a Self::Index) -> &'b dyn Container<Self::Context>;
+    /// Get the container identified by the index (mutable).
     fn get_mut<'a, 'b: 'a>(
         &'b mut self,
         index: &'a Self::Index,
     ) -> &'b mut dyn Container<Self::Context>;
+    /// The container selected by default (i.e., the start of the application)
     const DEFAULT_CONTAINER: Self::Index;
 }
 
@@ -174,6 +181,7 @@ impl<'a, 'b, 'c, 'd: 'a, C: ContainerProvider + 'a + 'b> Behavior
 
 /// A simple rectangle with integer coordinates. Nothing to see here.
 #[derive(Clone, Debug, PartialEq)]
+#[allow(missing_docs)]
 pub struct Rectangle {
     pub x_range: Range<ColIndex>,
     pub y_range: Range<RowIndex>,
@@ -260,18 +268,21 @@ impl Rectangle {
 }
 
 /// A single line occupying a number of cells in a row.
+#[allow(missing_docs)]
 pub struct HorizontalLine {
     pub x: ColIndex,
     pub y_range: Range<RowIndex>,
 }
 
 /// A single line occupying a number of cells in a column.
+#[allow(missing_docs)]
 pub struct VerticalLine {
     pub x_range: Range<ColIndex>,
     pub y: RowIndex,
 }
 
 /// An axis aligned line, either vertical or horizontal.
+#[allow(missing_docs)]
 pub enum Line {
     Horizontal(HorizontalLine),
     Vertical(VerticalLine),

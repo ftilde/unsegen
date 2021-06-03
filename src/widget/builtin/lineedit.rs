@@ -145,6 +145,7 @@ impl LineEdit {
         }
     }
 
+    /// Prepare for drawing as a `Widget`.
     pub fn as_widget<'a>(&'a self) -> LineEditWidget<'a> {
         LineEditWidget {
             lineedit: self,
@@ -218,6 +219,9 @@ impl Editable for LineEdit {
     }
 }
 
+/// A `Widget` representing a `LineEdit`
+///
+/// It allows for customization of cursor styles.
 pub struct LineEditWidget<'a> {
     lineedit: &'a LineEdit,
     cursor_style_active_blink_on: StyleModifier,
@@ -226,16 +230,21 @@ pub struct LineEditWidget<'a> {
 }
 
 impl<'a> LineEditWidget<'a> {
+    /// Define the style that the cursor will be drawn with on the "on" tick when the widget is
+    /// active.
     pub fn cursor_blink_on(mut self, style: StyleModifier) -> Self {
         self.cursor_style_active_blink_on = style;
         self
     }
 
+    /// Define the style that the cursor will be drawn with on the "off" tick when the widget is
+    /// active.
     pub fn cursor_blink_off(mut self, style: StyleModifier) -> Self {
         self.cursor_style_active_blink_off = style;
         self
     }
 
+    /// Define the style that the cursor will be drawn with when the widget is inactive.
     pub fn cursor_inactive(mut self, style: StyleModifier) -> Self {
         self.cursor_style_inactive = style;
         self

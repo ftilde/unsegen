@@ -16,7 +16,7 @@
 //!
 //! impl MyWidget {
 //!     fn as_widget<'a>(&'a self) -> impl Widget + 'a {
-//!         VLayout::new().alterating(StyleModifier::new().invert(true))
+//!         VLayout::new().alternating(StyleModifier::new().invert(true))
 //!             .widget("Some text on top")
 //!             .widget(self.prompt.as_widget())
 //!             .widget(self.buffer.as_widget())

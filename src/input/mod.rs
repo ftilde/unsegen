@@ -81,6 +81,7 @@ use std::io;
 /// terminal-like abstraction under certain circumstances (e.g., when writing a terminal
 /// multiplexer).
 #[derive(Eq, PartialEq, Clone, Debug)]
+#[allow(missing_docs)]
 pub struct Input {
     pub event: Event,
     pub raw: Vec<u8>,
@@ -231,6 +232,7 @@ impl From<Option<Input>> for InputChain {
 ///
 /// Basically an `Into<Event>`, but we cannot use that as Event is a reexport of termion.
 pub trait ToEvent {
+    /// Convert to an event.
     fn to_event(self) -> Event;
 }
 
@@ -286,6 +288,7 @@ impl EventSet {
 /// the input matches the desired criteria or using a pair `(ToEvent, FnOnce())` where the function
 /// is only iff the `Input` to be processed matches the provided `Event`-like thing.
 pub trait Behavior {
+    /// Receive, process and possibly consume the input.
     fn input(self, input: Input) -> Option<Input>;
 }
 
@@ -401,6 +404,7 @@ impl<'a, S: Scrollable> Behavior for ScrollBehavior<'a, S> {
 /// Note that `scroll_to_beginning` and `scroll_to_end` should be implemented manually if a fast
 /// pass is available and performance is important. By default these functions call
 /// `scroll_backwards` and `scroll_forwards` respectively until they fail.
+#[allow(missing_docs)]
 pub trait Scrollable {
     fn scroll_backwards(&mut self) -> OperationResult;
     fn scroll_forwards(&mut self) -> OperationResult;
@@ -429,6 +433,7 @@ pub struct WriteBehavior<'a, W: Writable + 'a> {
     writable: &'a mut W,
 }
 impl<'a, W: Writable + 'a> WriteBehavior<'a, W> {
+    /// Create a new Behavior for the `Writable`.
     pub fn new(writable: &'a mut W) -> Self {
         WriteBehavior { writable: writable }
     }
@@ -449,6 +454,7 @@ impl<'a, W: Writable + 'a> Behavior for WriteBehavior<'a, W> {
 /// All inputs that correspond to keystrokes with a corresponding `char` representation will be
 /// converted and passed to the `Writable`.
 pub trait Writable {
+    /// Process the provided char and report if it was processed successfully.
     fn write(&mut self, c: char) -> OperationResult;
 }
 
@@ -523,6 +529,7 @@ impl<'a, N: Navigatable + 'a> Behavior for NavigateBehavior<'a, N> {
 
 /// Something that can be navigated like a cursor in a text editor or character in a simple 2D
 /// game.
+#[allow(missing_docs)]
 pub trait Navigatable {
     fn move_up(&mut self) -> OperationResult;
     fn move_down(&mut self) -> OperationResult;
@@ -664,5 +671,6 @@ pub trait Editable: Navigatable + Writable {
     fn go_to_beginning_of_line(&mut self) -> OperationResult;
     /// In the sense of pressing the "End" key.
     fn go_to_end_of_line(&mut self) -> OperationResult;
+    /// Remove all content.
     fn clear(&mut self) -> OperationResult;
 }

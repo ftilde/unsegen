@@ -25,13 +25,36 @@ pub trait Widget {
     fn draw(&self, window: Window, hints: RenderingHints);
 }
 
-//pub trait WidgetExt: Widget {
-//    fn centered(self) -> Centered<Self> {
-//        Centered(self)
-//    }
-//}
+/// An extension trait to Widget which access to convenience methods that alters the behavior of
+/// the wrapped widgets.
+pub trait WidgetExt: Widget + Sized {
+    /// Center the widget according to the specified maximum demand within the supplied window.
+    /// This is only useful if the widget has a defined maximum size and the window is larger than
+    /// that.
+    fn centered(self) -> Centered<Self> {
+        Centered(self)
+    }
 
-pub struct Centered<W>(pub W);
+    /// Alter the window before letting the widget draw itself in it.
+    fn with_window<F: Fn(Window, RenderingHints) -> Window>(self, f: F) -> WithWindow<Self, F> {
+        WithWindow(self, f)
+    }
+
+    /// Alter the reported demand of the widget. This can be useful, for example, to force a widget
+    /// to assume all space in the window or to artificially restrict the size of a widget.
+    fn with_demand<F: Fn(Demand2D) -> Demand2D>(self, f: F) -> WithDemand<Self, F> {
+        WithDemand(self, f)
+    }
+}
+
+impl<W: Widget + Sized> WidgetExt for W {}
+
+/// Center the widget according to the specified maximum demand within the supplied window.
+/// This is only useful if the widget has a defined maximum size and the window is larger than
+/// that.
+///
+/// This wrapper can be created using `WidgetExt::centered`.
+pub struct Centered<W>(W);
 
 impl<W: Widget> Widget for Centered<W> {
     fn space_demand(&self) -> Demand2D {
@@ -60,11 +83,40 @@ impl<W: Widget> Widget for Centered<W> {
     }
 }
 
-impl<S: std::borrow::Borrow<str>> Widget for S {
+/// Alter the window before letting the widget draw itself in it.
+///
+/// This wrapper can be created using `WidgetExt::centered`.
+pub struct WithWindow<W, F>(W, F);
+
+impl<W: Widget, F: Fn(Window, RenderingHints) -> Window> Widget for WithWindow<W, F> {
+    fn space_demand(&self) -> Demand2D {
+        self.0.space_demand()
+    }
+    fn draw(&self, window: Window, hints: RenderingHints) {
+        self.0.draw(self.1(window, hints), hints);
+    }
+}
+
+/// Alter the reported demand of the widget. This can be useful, for example, to force a widget
+/// to assume all space in the window or to artificially restrict the size of a widget.
+///
+/// This wrapper can be created using `WidgetExt::centered`.
+pub struct WithDemand<W, F>(W, F);
+
+impl<W: Widget, F: Fn(Demand2D) -> Demand2D> Widget for WithDemand<W, F> {
+    fn space_demand(&self) -> Demand2D {
+        self.1(self.0.space_demand())
+    }
+    fn draw(&self, window: Window, hints: RenderingHints) {
+        self.0.draw(window, hints);
+    }
+}
+
+impl<S: std::convert::AsRef<str>> Widget for S {
     fn space_demand(&self) -> Demand2D {
         let mut width = 0;
         let mut height = 0;
-        for line in self.borrow().lines() {
+        for line in self.as_ref().lines() {
             width = width.max(crate::widget::count_grapheme_clusters(line));
             height += 1;
         }
@@ -75,7 +127,7 @@ impl<S: std::borrow::Borrow<str>> Widget for S {
     }
     fn draw(&self, mut window: Window, _hints: RenderingHints) {
         let mut cursor = Cursor::new(&mut window).wrapping_mode(WrappingMode::Wrap);
-        cursor.write(self.borrow());
+        cursor.write(self.as_ref());
     }
 }
 
@@ -109,12 +161,16 @@ impl RenderingHints {
             _do_not_construct: (),
         }
     }
+    /// Hint on whether the widget is active, i.e., most of the time: It receives input.
     pub fn active(self, val: bool) -> Self {
         RenderingHints {
             active: val,
             ..self
         }
     }
+
+    /// Use this to implement blinking effects for your widget. Usually, Blink can be expected to
+    /// alternate every second or so.
     pub fn blink(self, val: Blink) -> Self {
         RenderingHints { blink: val, ..self }
     }
@@ -124,12 +180,14 @@ impl RenderingHints {
 ///
 /// Think of it like the state of an LED or cursor (block).
 #[derive(Clone, Copy, Debug)]
+#[allow(missing_docs)]
 pub enum Blink {
     On,
     Off,
 }
 
 impl Blink {
+    /// Get the alternate on/off value.
     pub fn toggled(self) -> Self {
         match self {
             Blink::On => Blink::Off,
@@ -137,6 +195,7 @@ impl Blink {
         }
     }
 
+    /// Change to the alternate on/off value.
     pub fn toggle(&mut self) {
         *self = self.toggled();
     }
@@ -147,6 +206,7 @@ impl Blink {
 /// A Demand always has a minimum (although it may be zero) and may have a maximum. It is required
 /// that the minimum is smaller or equal to the maximum (if present).
 #[derive(Eq, PartialEq, PartialOrd, Clone, Copy, Debug)]
+#[allow(missing_docs)]
 pub struct Demand<T: AxisDimension> {
     pub min: PositiveAxisDiff<T>,
     pub max: Option<PositiveAxisDiff<T>>,
@@ -252,11 +312,14 @@ impl<T: AxisDimension + PartialOrd + Ord> Demand<T> {
     }
 }
 
+/// Horizontal Demand
 pub type ColDemand = Demand<ColDimension>;
+/// Vertical Demand
 pub type RowDemand = Demand<RowDimension>;
 
 /// A two dimensional (rectangular) Demand (composed of `Demand`s for columns and rows).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct Demand2D {
     pub width: ColDemand,
     pub height: RowDemand,

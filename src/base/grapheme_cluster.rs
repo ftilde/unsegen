@@ -144,6 +144,7 @@ impl<'a> Iterator for GraphemeClusterIter<'a> {
 
 /// An error associated with the creation of GraphemeCluster from arbitrary strings.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum GraphemeClusterError {
     MultipleGraphemeClusters,
     NoGraphemeCluster,

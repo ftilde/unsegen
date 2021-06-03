@@ -7,6 +7,7 @@ use termion;
 /// Specified attributes include "bold", "italic", "invert", and "underline" and can be combined
 /// freely.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[allow(missing_docs)]
 pub struct TextFormat {
     pub bold: bool,
     pub italic: bool,
@@ -56,6 +57,7 @@ impl Default for TextFormat {
 ///
 /// (In essence, specifies one of all possible unary boolean functions.)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum BoolModifyMode {
     True,
     False,
@@ -132,6 +134,7 @@ impl ::std::convert::From<bool> for BoolModifyMode {
 
 /// Specifies how to modify a text format value.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[allow(missing_docs)]
 pub struct TextFormatModifier {
     pub bold: BoolModifyMode,
     pub italic: BoolModifyMode,
@@ -268,6 +271,7 @@ impl Default for TextFormatModifier {
 ///
 /// Not all terminals may support Rgb, though.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[allow(missing_docs)]
 pub enum Color {
     Default,
     Rgb { r: u8, g: u8, b: u8 },

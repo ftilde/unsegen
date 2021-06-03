@@ -11,6 +11,7 @@ pub struct PromptLine {
     edit_prompt: String,
     scroll_prompt: String,
     search_prompt: String,
+    #[allow(missing_docs)]
     pub line: LineEdit,
     history: Vec<String>,
     state: State,
@@ -127,6 +128,10 @@ impl PromptLine {
         &self.history[self.history.len() - 1]
     }
 
+    /// Switch state to "searching".
+    ///
+    /// This means that that character inputs will instead be consumed for the search pattern and
+    /// up/down naviation will cycle through matching items from the history.
     pub fn enter_search(&mut self) {
         let mut tmp = State::Editing;
         std::mem::swap(&mut tmp, &mut self.state);
@@ -181,6 +186,7 @@ impl PromptLine {
         }
     }
 
+    /// Prepare for drawing as a `Widget`.
     pub fn as_widget<'a>(&'a self) -> impl Widget + 'a {
         let prompt = match &self.state {
             State::Editing => self.edit_prompt.clone(),

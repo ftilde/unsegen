@@ -274,6 +274,13 @@ fn draw_linearly<'a, T: AxisDimension + Ord + Debug + Copy, S, L, M, D>(
     }
 }
 
+/// A wrapper widget to lay out a set of widgets from left to right
+///
+/// Widgets can be weighted so that widgets with a higher weight receive a larger percentage of the
+/// available space during layouting. One way to assign weights would be to assign percentages (as
+/// weights) to the widgets. Please note that these are not absolute: For example, the minimum
+/// demand of all widgets will be met before *then* assigning additional space according to weights
+/// again.
 pub struct HLayout<'a> {
     separating_style: SeparatingStyle,
     widgets: Vec<Box<dyn Widget + 'a>>,
@@ -281,6 +288,7 @@ pub struct HLayout<'a> {
 }
 
 impl<'a> HLayout<'a> {
+    /// Create an empty widget with no separation of added widgets by default.
     pub fn new() -> Self {
         HLayout {
             separating_style: SeparatingStyle::None,
@@ -289,23 +297,34 @@ impl<'a> HLayout<'a> {
         }
     }
 
-    pub fn separator(self, separator: GraphemeCluster) -> Self {
-        self.separating_style(SeparatingStyle::Draw(separator))
-    }
-
-    pub fn alterating(self, style_modifier: StyleModifier) -> Self {
-        self.separating_style(SeparatingStyle::AlternatingStyle(style_modifier))
-    }
-
+    /// Specify the style for (horizontal) separation of added widgets.
     pub fn separating_style(mut self, style: SeparatingStyle) -> Self {
         self.separating_style = style;
         self
     }
 
+    /// Make widgets be separated by the given GraphemeCluster (convenience wrapper around
+    /// `separating_style` method and specifying SeparatingStyle::Draw).
+    pub fn separator(self, separator: GraphemeCluster) -> Self {
+        self.separating_style(SeparatingStyle::Draw(separator))
+    }
+
+    /// Separate widgets visually by changing the style of every second widget (convenience wrapper
+    /// around `separating_style` method and specifying SeparatingStyle::AlternatingStyle).
+    pub fn alternating(self, style_modifier: StyleModifier) -> Self {
+        self.separating_style(SeparatingStyle::AlternatingStyle(style_modifier))
+    }
+
+    /// Add a widget to the list of widgets to be layed out. It will be placed to the right of all
+    /// previously added widgets.
+    ///
+    /// A default weight of 1.0 is assigned.
     pub fn widget<W: Widget + 'a>(self, t: W) -> Self {
         self.widget_weighted(t, 1.0)
     }
 
+    /// Add a widget with associated weight to the list of widgets to be layed out. It will be
+    /// placed to the right of all previously added widgets.
     pub fn widget_weighted<W: Widget + 'a>(mut self, t: W, weight: f64) -> Self {
         self.widgets.push(Box::new(t));
         self.weights.push(weight);
@@ -350,6 +369,13 @@ impl<'a> Widget for HLayout<'a> {
     }
 }
 
+/// A wrapper widget to lay out a set of widgets from top to bottom
+///
+/// Widgets can be weighted so that widgets with a higher weight receive a larger percentage of the
+/// available space during layouting. One way to assign weights would be to assign percentages (as
+/// weights) to the widgets. Please note that these are not absolute: For example, the minimum
+/// demand of all widgets will be met before *then* assigning additional space according to weights
+/// again.
 pub struct VLayout<'a> {
     separating_style: SeparatingStyle,
     widgets: Vec<Box<dyn Widget + 'a>>,
@@ -357,6 +383,7 @@ pub struct VLayout<'a> {
 }
 
 impl<'a> VLayout<'a> {
+    /// Create an empty widget with no separation of added widgets by default.
     pub fn new() -> Self {
         VLayout {
             separating_style: SeparatingStyle::None,
@@ -365,23 +392,34 @@ impl<'a> VLayout<'a> {
         }
     }
 
-    pub fn separator(self, separator: GraphemeCluster) -> Self {
-        self.separating_style(SeparatingStyle::Draw(separator))
-    }
-
-    pub fn alterating(self, style_modifier: StyleModifier) -> Self {
-        self.separating_style(SeparatingStyle::AlternatingStyle(style_modifier))
-    }
-
+    /// Make widgets be separated by the given GraphemeCluster (convenience wrapper around
+    /// `separating_style` method and specifying SeparatingStyle::Draw).
     pub fn separating_style(mut self, style: SeparatingStyle) -> Self {
         self.separating_style = style;
         self
     }
 
+    /// Specify the style for (vertical) separation of added widgets.
+    pub fn separator(self, separator: GraphemeCluster) -> Self {
+        self.separating_style(SeparatingStyle::Draw(separator))
+    }
+
+    /// Separate widgets visually by changing the style of every second widget (convenience wrapper
+    /// around `separating_style` method and specifying SeparatingStyle::AlternatingStyle).
+    pub fn alternating(self, style_modifier: StyleModifier) -> Self {
+        self.separating_style(SeparatingStyle::AlternatingStyle(style_modifier))
+    }
+
+    /// Add a widget to the list of widgets to be layed out. It will be placed below all previously
+    /// added widgets.
+    ///
+    /// A default weight of 1.0 is assigned.
     pub fn widget<W: Widget + 'a>(self, t: W) -> Self {
         self.widget_weighted(t, 1.0)
     }
 
+    /// Add a widget with associated weight to the list of widgets to be layed out. It will be
+    /// placed below all previously added widgets.
     pub fn widget_weighted<W: Widget + 'a>(mut self, t: W, weight: f64) -> Self {
         self.widgets.push(Box::new(t));
         self.weights.push(weight);

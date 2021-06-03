@@ -3,6 +3,7 @@ use base::GraphemeCluster;
 
 /// Components of unicode box characters. A single character can contain up to 4 segments.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum LineSegment {
     Up,
     Down,
@@ -23,6 +24,7 @@ impl LineSegment {
 
 /// The type of a segment of a unicode box character
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum LineType {
     None,
     Thin,

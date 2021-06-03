@@ -46,6 +46,7 @@ impl LogViewer {
         &self.storage[range.start.raw_value()..range.end.raw_value()]
     }
 
+    /// Prepare for drawing as a `Widget`.
     pub fn as_widget<'a>(&'a self) -> impl Widget + 'a {
         LogViewerWidget { inner: self }
     }

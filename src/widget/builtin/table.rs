@@ -29,6 +29,7 @@ pub struct Column<T: TableRow + ?Sized> {
 ///
 /// Implement this trait, if you want to create a `Table`!
 pub trait TableRow: 'static {
+    /// Type that will be passed as a parameter to the `behavior` method of `Column`.
     type BehaviorContext;
     /// Define the behavior of individual columns of the table.
     const COLUMNS: &'static [Column<Self>];
@@ -168,6 +169,7 @@ impl<R: TableRow + 'static> Table<R> {
         CurrentCellBehavior { table: self, p }
     }
 
+    /// Prepare for drawing as a `Widget`.
     pub fn as_widget<'a>(&'a self) -> TableWidget<'a, R> {
         TableWidget {
             table: self,
@@ -191,6 +193,10 @@ impl<R: TableRow + 'static> Behavior for CurrentCellBehavior<'_, '_, R> {
     }
 }
 
+/// A `Widget` representing a `LineEdit`
+///
+/// It allows for customization of vertical/horizontal separation styles and style for the focused
+/// cell.
 pub struct TableWidget<'a, R: TableRow + 'static> {
     table: &'a Table<R>,
     row_sep_style: SeparatingStyle,
@@ -200,21 +206,26 @@ pub struct TableWidget<'a, R: TableRow + 'static> {
 }
 
 impl<'a, R: TableRow + 'static> TableWidget<'a, R> {
+    /// Specify the style for visual vertical separation (default: None)
     pub fn row_separation(mut self, style: SeparatingStyle) -> Self {
         self.row_sep_style = style;
         self
     }
 
+    /// Specify the style for visual horizontal separation (default: None)
     pub fn col_separation(mut self, style: SeparatingStyle) -> Self {
         self.col_sep_style = style;
         self
     }
 
+    /// Specify the style override for the active cell (default: None)
     pub fn focused(mut self, style: StyleModifier) -> Self {
         self.focused_style = style;
         self
     }
 
+    /// Specify the minimum number of rows shown below/above the active row (if possible). Default:
+    /// 1
     pub fn min_context(mut self, rows: u32) -> Self {
         self.min_context = rows;
         self
