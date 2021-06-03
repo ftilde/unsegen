@@ -2,7 +2,7 @@
 
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
 
-## [0.3.0] - UNRELEASED
+## [0.3.0] - 2021-06-03
 ### Added
 - Implement `Widget` for strings (for `Borrow<str>`).
 - Add `WidgetExt` with some convenience methods to change Widget behavior.
