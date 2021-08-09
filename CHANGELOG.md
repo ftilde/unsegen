@@ -2,6 +2,10 @@
 
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
 
+## [0.3.1] - UNRELEASED
+### Added
+- Add `WithHints` and WidgetExt `with_hints`.
+
 ## [0.3.0] - 2021-06-03
 ### Added
 - Implement `Widget` for strings (for `Borrow<str>`).

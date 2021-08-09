@@ -40,6 +40,12 @@ pub trait WidgetExt: Widget + Sized {
         WithWindow(self, f)
     }
 
+    /// Alter the rendering hints before rendering.
+    /// to assume all space in the window or to artificially restrict the size of a widget.
+    fn with_hints<F: Fn(RenderingHints) -> RenderingHints>(self, f: F) -> WithHints<Self, F> {
+        WithHints(self, f)
+    }
+
     /// Alter the reported demand of the widget. This can be useful, for example, to force a widget
     /// to assume all space in the window or to artificially restrict the size of a widget.
     fn with_demand<F: Fn(Demand2D) -> Demand2D>(self, f: F) -> WithDemand<Self, F> {
@@ -85,7 +91,7 @@ impl<W: Widget> Widget for Centered<W> {
 
 /// Alter the window before letting the widget draw itself in it.
 ///
-/// This wrapper can be created using `WidgetExt::centered`.
+/// This wrapper can be created using `WidgetExt::with_window`.
 pub struct WithWindow<W, F>(W, F);
 
 impl<W: Widget, F: Fn(Window, RenderingHints) -> Window> Widget for WithWindow<W, F> {
@@ -97,10 +103,24 @@ impl<W: Widget, F: Fn(Window, RenderingHints) -> Window> Widget for WithWindow<W
     }
 }
 
+/// Alter the rendering hints before drawing the wrapped widget.
+///
+/// This wrapper can be created using `WidgetExt::with_hints`.
+pub struct WithHints<W, F>(W, F);
+
+impl<W: Widget, F: Fn(RenderingHints) -> RenderingHints> Widget for WithHints<W, F> {
+    fn space_demand(&self) -> Demand2D {
+        self.0.space_demand()
+    }
+    fn draw(&self, window: Window, hints: RenderingHints) {
+        self.0.draw(window, self.1(hints));
+    }
+}
+
 /// Alter the reported demand of the widget. This can be useful, for example, to force a widget
 /// to assume all space in the window or to artificially restrict the size of a widget.
 ///
-/// This wrapper can be created using `WidgetExt::centered`.
+/// This wrapper can be created using `WidgetExt::with_demand`.
 pub struct WithDemand<W, F>(W, F);
 
 impl<W: Widget, F: Fn(Demand2D) -> Demand2D> Widget for WithDemand<W, F> {
