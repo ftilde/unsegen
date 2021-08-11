@@ -5,6 +5,7 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 ## [0.3.1] - UNRELEASED
 ### Added
 - Add `WithHints` and WidgetExt `with_hints`.
+- Add `Cursor::move_to_bottom`.
 
 ## [0.3.0] - 2021-06-03
 ### Added

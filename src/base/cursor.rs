@@ -166,6 +166,11 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         self.state.y = y;
     }
 
+    /// Move the cursor to the last line of the window
+    pub fn move_to_bottom(&mut self) {
+        self.state.y = (self.window.get_height() - 1).from_origin();
+    }
+
     /// Move left, but skip empty clusters, also wrap to the line above if wrapping is active
     pub fn move_left(&mut self) {
         loop {
