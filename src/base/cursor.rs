@@ -221,6 +221,16 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
         }
     }
 
+    /// Move one row up
+    pub fn move_up(&mut self) {
+        self.state.y -= 1;
+    }
+
+    /// Move one row down
+    pub fn move_down(&mut self) {
+        self.state.y += 1;
+    }
+
     /// Change the wrapping mode of the cursor (i.e., either changing to a new line or writing
     /// outside of the window).
     pub fn set_wrapping_mode(&mut self, wm: WrappingMode) {
