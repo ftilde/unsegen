@@ -44,6 +44,7 @@ where
     values: WindowBuffer,
     terminal: TtyWithGuard<T>,
     size_has_changed_since_last_present: bool,
+    bell_emitted_since_last_present: bool,
     _phantom: ::std::marker::PhantomData<&'a ()>,
 }
 
@@ -60,6 +61,7 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
             values: WindowBuffer::new(Width::new(0).unwrap(), Height::new(0).unwrap()),
             terminal,
             size_has_changed_since_last_present: true,
+            bell_emitted_since_last_present: false,
             _phantom: Default::default(),
         };
         term.enter_tui()?;
@@ -155,6 +157,11 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
         self.values.as_window()
     }
 
+    /// Emit a bell on next present
+    pub fn emit_bell(&mut self) {
+        self.bell_emitted_since_last_present = true;
+    }
+
     /// Present the current buffer content to the actual terminal.
     pub fn present(&mut self) {
         let mut current_style = Style::default();
@@ -162,6 +169,10 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
         if self.size_has_changed_since_last_present {
             write!(self.terminal, "{}", termion::clear::All).expect("clear");
             self.size_has_changed_since_last_present = false;
+        }
+        if self.bell_emitted_since_last_present {
+            print!("\x07");
+            self.bell_emitted_since_last_present = false;
         }
         for (y, line) in self.values.storage().axis_iter(Axis(0)).enumerate() {
             write!(
