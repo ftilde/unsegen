@@ -659,6 +659,11 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
     pub fn save<'a>(&'a mut self) -> CursorRestorer<'a, 'c, 'g, T> {
         CursorRestorer::new(self)
     }
+
+    /// Return a reference to the target of the cursor.
+    pub fn target(&self) -> &T {
+        self.window
+    }
 }
 
 impl<'c, 'g: 'c, T: 'c + CursorTarget> ::std::fmt::Write for Cursor<'c, 'g, T> {

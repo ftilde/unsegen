@@ -5,7 +5,7 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 ## [0.3.1] - UNRELEASED
 ### Added
 - Add `WithHints` and WidgetExt `with_hints`.
-- Add `Cursor::move_to_bottom`.
+- Add `Cursor::move_to_bottom`, `Cursor::target`.
 - Add `TextEdit` widget which allows multi line editing.
 
 ## [0.3.0] - 2021-06-03
