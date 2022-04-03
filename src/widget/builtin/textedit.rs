@@ -2,10 +2,130 @@
 use base::{BoolModifyMode, ColIndex, Cursor, LineIndex, StyleModifier, Width, Window};
 use input::{Editable, Navigatable, OperationResult, Writable};
 use ropey::{Rope, RopeSlice};
+use std::ops::{Bound, RangeBounds};
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 use widget::{text_width, Blink, Demand, Demand2D, RenderingHints, Widget};
 
+/// A part of a text that can be moved to in a `TextEdit`
+#[derive(Copy, Clone)]
+pub enum TextElement {
+    /// The first character of a WORD
+    WordBegin,
+    /// The last character of a WORD
+    WordEnd,
+    /// Roughly, a single "character"
+    GraphemeCluster,
+    /// Beginning or end of the line
+    LineSeparator,
+    /// Beginning or end of the document
+    DocumentBoundary,
+    /// First character of the a sentence
+    Sentence,
+}
+
+#[derive(Copy, Clone)]
+enum Direction {
+    Forward,
+    Backward,
+}
+
+/// A text location relative to the cursor of a `TextEdit`
+#[derive(Copy, Clone)]
+pub struct TextTarget {
+    element: TextElement,
+    direction: Direction,
+    count: usize,
+}
+
+impl TextTarget {
+    /// Construct a target after the cursor
+    pub fn forward(element: TextElement) -> Self {
+        TextTarget {
+            element,
+            direction: Direction::Forward,
+            count: 1,
+        }
+    }
+    /// Construct a target before the cursor
+    pub fn backward(element: TextElement) -> Self {
+        TextTarget {
+            element,
+            direction: Direction::Backward,
+            count: 1,
+        }
+    }
+    /// Construct a target exactly at the cursor position
+    pub fn cursor() -> Self {
+        TextTarget {
+            element: TextElement::GraphemeCluster,
+            direction: Direction::Forward,
+            count: 0,
+        }
+    }
+    /// Refer to the n'th instead of the first occurence of a `TextElement` in the specified
+    /// direction.
+    pub fn nth(mut self, n: usize) -> Self {
+        self.count = n;
+        self
+    }
+}
+
+fn pos(r: Result<TextPosition, TextPosition>) -> TextPosition {
+    match r {
+        Ok(p) => p,
+        Err(p) => p,
+    }
+}
+
+fn op_res(r: Result<TextPosition, TextPosition>) -> Result<(), ()> {
+    match r {
+        Ok(_) => Ok(()),
+        Err(_) => Err(()),
+    }
+}
+
 struct Text(Rope);
+
+struct ClusterPair {
+    p_left: TextPosition,
+    left: String,
+    p_middle: TextPosition,
+    right: String,
+}
+
+fn find_word_begin(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPosition> {
+    it.find_map(|p| {
+        if is_whitespace(&p.left) && !is_whitespace(&p.right) {
+            Some(p.p_middle)
+        } else {
+            None
+        }
+    })
+}
+
+fn find_word_end(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPosition> {
+    it.find_map(|p| {
+        if !is_whitespace(&p.left) && is_whitespace(&p.right) {
+            Some(p.p_left)
+        } else {
+            None
+        }
+    })
+}
+
+fn find_sentence_boundary(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPosition> {
+    it.find_map(|p| {
+        if p.left == "." && is_whitespace(&p.right) {
+            Some(p.p_left)
+        } else {
+            None
+        }
+    })
+}
+
+fn is_whitespace(s: &str) -> bool {
+    matches!(s, " " | "\n" | "\t")
+}
 
 impl Text {
     fn empty() -> Self {
@@ -20,6 +140,132 @@ impl Text {
         }
         Ok(pos)
     }
+
+    fn grapheme_clusters_forwards<'a>(
+        &'a self,
+        from: TextPosition,
+    ) -> impl Iterator<Item = ClusterPair> + 'a {
+        let mut p_left = from;
+        let mut maybe_p_middle = self.next_grapheme_cluster(p_left).ok();
+        std::iter::from_fn(move || {
+            let p_middle = maybe_p_middle?;
+            let p_right = self.next_grapheme_cluster(p_middle).ok()?;
+            let p = ClusterPair {
+                p_left,
+                left: self.slice(p_left..p_middle).to_string(),
+                p_middle,
+                right: self.slice(p_middle..p_right).to_string(),
+            };
+            p_left = p_middle;
+            maybe_p_middle = Some(p_right);
+            Some(p)
+        })
+    }
+
+    fn grapheme_clusters_backwards<'a>(
+        &'a self,
+        from: TextPosition,
+    ) -> impl Iterator<Item = ClusterPair> + 'a {
+        let mut p_right = from;
+        let mut maybe_p_middle = self.prev_grapheme_cluster(p_right).ok();
+        std::iter::from_fn(move || {
+            let p_middle = maybe_p_middle?;
+            let p_left = self.prev_grapheme_cluster(p_middle).ok()?;
+            let p = ClusterPair {
+                p_left,
+                left: self.slice(p_left..p_middle).to_string(),
+                p_middle,
+                right: self.slice(p_middle..p_right).to_string(),
+            };
+            p_right = p_middle;
+            maybe_p_middle = Some(p_left);
+            Some(p)
+        })
+    }
+
+    fn next_element(
+        &self,
+        begin: TextPosition,
+        elm: TextElement,
+    ) -> Result<TextPosition, TextPosition> {
+        let mut clusters = self.grapheme_clusters_forwards(begin);
+        let p = match elm {
+            TextElement::GraphemeCluster => self.next_grapheme_cluster(begin).ok(),
+            TextElement::WordBegin => find_word_begin(clusters),
+            TextElement::WordEnd => {
+                if let Some(_) = clusters.next() {
+                    find_word_end(clusters).or(self.prev_grapheme_cluster(self.end()).ok())
+                } else {
+                    None
+                }
+            }
+            TextElement::Sentence => {
+                if let Some(p) = find_sentence_boundary(clusters) {
+                    find_word_begin(self.grapheme_clusters_forwards(p))
+                } else {
+                    None
+                }
+            }
+            TextElement::LineSeparator => Some(self.line_end(begin)),
+            TextElement::DocumentBoundary => Some(self.end()),
+        };
+        let p = p.unwrap_or(self.end());
+        if p != begin {
+            Ok(p)
+        } else {
+            Err(p)
+        }
+    }
+
+    fn prev_element(
+        &self,
+        begin: TextPosition,
+        elm: TextElement,
+    ) -> Result<TextPosition, TextPosition> {
+        let clusters = self.grapheme_clusters_backwards(begin);
+        let p = match elm {
+            TextElement::GraphemeCluster => self.prev_grapheme_cluster(begin).ok(),
+            TextElement::WordBegin => find_word_begin(clusters),
+            TextElement::WordEnd => find_word_end(clusters),
+            TextElement::Sentence => find_word_begin(clusters)
+                .and_then(|p| find_sentence_boundary(self.grapheme_clusters_backwards(p)))
+                .and_then(|p| find_word_begin(self.grapheme_clusters_forwards(p))),
+            TextElement::LineSeparator => Some(self.line_begin(begin)),
+            TextElement::DocumentBoundary => Some(self.begin()),
+        };
+        let p = p.unwrap_or(self.begin());
+        if p != begin {
+            Ok(p)
+        } else {
+            Err(p)
+        }
+    }
+
+    fn resolve_target(
+        &self,
+        begin: TextPosition,
+        target: TextTarget,
+    ) -> Result<TextPosition, TextPosition> {
+        let mut pos = begin;
+        for i in 0..target.count {
+            match target.direction {
+                Direction::Forward => match self.next_element(pos, target.element) {
+                    Ok(p) => pos = p,
+                    Err(p) => {
+                        return if i == 0 { Err(p) } else { Ok(p) };
+                    }
+                },
+                Direction::Backward => match self.prev_element(pos, target.element) {
+                    Ok(p) => pos = p,
+                    Err(p) => {
+                        return if i == 0 { Err(p) } else { Ok(p) };
+                    }
+                },
+            }
+        }
+        Ok(pos)
+    }
+
     fn next_grapheme_cluster(&self, pos: TextPosition) -> Result<TextPosition, ()> {
         let (mut chunk, mut chunk_begin, _, _) = self.0.chunk_at_byte(pos.0);
         let mut cursor = GraphemeCursor::new(pos.0, self.0.len_bytes(), true);
@@ -39,12 +285,6 @@ impl Text {
                 _ => unreachable!(),
             }
         }
-    }
-    fn clusters_backward(&self, mut pos: TextPosition, n: usize) -> Result<TextPosition, ()> {
-        for _ in 0..n {
-            pos = self.prev_grapheme_cluster(pos)?;
-        }
-        Ok(pos)
     }
     fn prev_grapheme_cluster(&self, pos: TextPosition) -> Result<TextPosition, ()> {
         let (mut chunk, mut chunk_begin, _, _) = self.0.chunk_at_byte(pos.0);
@@ -216,34 +456,56 @@ impl TextEdit {
         }
     }
 
-    /// Get the current content.
-    pub fn get(&self) -> String {
-        self.text
-            .slice(self.text.begin()..self.text.end())
-            .to_string()
+    /// Get the current content in the given range.
+    pub fn get(&self, bounds: impl RangeBounds<TextTarget>) -> String {
+        let s = self.resolve_range(bounds);
+        self.text.slice(s.0..s.1).to_string()
     }
 
     /// Set (and overwrite) the current content. The cursor will be placed at the very end of the
     /// text.
     pub fn set(&mut self, text: impl AsRef<str>) {
         self.text = Text::with_content(text.as_ref());
-        self.move_cursor_to_end();
-    }
-
-    /// Move the cursor to the end of the last line.
-    pub fn move_cursor_to_end(&mut self) {
         self.cursor_pos = self.text.end();
     }
 
-    /// Move the cursor to the end, i.e., *behind* the last grapheme cluster of the current line.
-    pub fn move_cursor_to_end_of_line(&mut self) {
-        self.cursor_pos = self.text.line_end(self.cursor_pos);
+    /// Remove the given range from the content.
+    /// The cursor will be set to the beginning of the deleted range.
+    pub fn delete(&mut self, bounds: impl RangeBounds<TextTarget>) {
+        let s = self.resolve_range(bounds);
+        self.text.remove(s.0..s.1);
+        self.cursor_pos = s.0;
     }
 
-    /// Move the cursor to the beginning, i.e., *onto* the first grapheme cluster of the current
-    /// line.
-    pub fn move_cursor_to_beginning_of_line(&mut self) {
-        self.cursor_pos = self.text.line_begin(self.cursor_pos);
+    /// Move the cursor the specified position (relative to the current position).
+    pub fn move_cursor_to(&mut self, target: TextTarget) -> Result<(), ()> {
+        let r = self.text.resolve_target(self.cursor_pos, target);
+        self.cursor_pos = pos(r);
+        op_res(r)
+    }
+
+    fn resolve_range(&self, bounds: impl RangeBounds<TextTarget>) -> (TextPosition, TextPosition) {
+        let start = match bounds.start_bound() {
+            Bound::Included(t) => pos(self.text.resolve_target(self.cursor_pos, *t)),
+            Bound::Excluded(t) => {
+                let p = pos(self.text.resolve_target(self.cursor_pos, *t));
+                self.text
+                    .next_grapheme_cluster(p)
+                    .unwrap_or(self.text.end())
+            }
+            Bound::Unbounded => self.text.begin(),
+        };
+        let end = match bounds.end_bound() {
+            Bound::Included(t) => {
+                let p = pos(self.text.resolve_target(self.cursor_pos, *t));
+                self.text
+                    .next_grapheme_cluster(p)
+                    .unwrap_or(self.text.end())
+            }
+            Bound::Excluded(t) => pos(self.text.resolve_target(self.cursor_pos, *t)),
+            Bound::Unbounded => self.text.end(),
+        };
+        (start, end)
     }
 
     fn move_cursor_down(&mut self) -> Result<(), ()> {
@@ -360,12 +622,10 @@ impl Editable for TextEdit {
         Ok(())
     }
     fn go_to_beginning_of_line(&mut self) -> OperationResult {
-        self.move_cursor_to_beginning_of_line();
-        Ok(())
+        self.move_cursor_to(TextTarget::backward(TextElement::LineSeparator))
     }
     fn go_to_end_of_line(&mut self) -> OperationResult {
-        self.move_cursor_to_end_of_line();
-        Ok(())
+        self.move_cursor_to(TextTarget::forward(TextElement::LineSeparator))
     }
     fn clear(&mut self) -> OperationResult {
         if self.text.0.len_bytes() == 0 {
@@ -558,6 +818,68 @@ mod test {
     }
 
     #[test]
+    fn test_set_truncate() {
+        test_textedit((3, 1), "d* *_", |t| {
+            t.set("abc");
+            t.set("d");
+        });
+    }
+
+    #[test]
+    fn test_get() {
+        test_textedit((5, 2), "*a*b cd|efg h", |t| {
+            t.set("ab cd\nefg h");
+            assert_eq!(t.get(..), "ab cd\nefg h");
+            assert_eq!(
+                t.get(TextTarget::backward(TextElement::GraphemeCluster).nth(2)..),
+                " h"
+            );
+            assert_eq!(t.get(TextTarget::backward(TextElement::WordBegin)..), "h");
+            assert_eq!(
+                t.get(TextTarget::backward(TextElement::LineSeparator)..),
+                "efg h"
+            );
+
+            t.move_cursor_to(TextTarget::backward(TextElement::DocumentBoundary))
+                .unwrap();
+            assert_eq!(t.get(..), "ab cd\nefg h");
+            assert_eq!(
+                t.get(..TextTarget::backward(TextElement::LineSeparator)),
+                ""
+            );
+            assert_eq!(
+                t.get(..=TextTarget::backward(TextElement::LineSeparator)),
+                "a"
+            );
+            assert_eq!(
+                t.get(..=TextTarget::forward(TextElement::WordEnd).nth(2)),
+                "ab cd"
+            );
+            assert_eq!(
+                t.get(..TextTarget::forward(TextElement::LineSeparator).nth(2)),
+                "ab cd"
+            );
+        });
+    }
+
+    #[test]
+    fn test_delete() {
+        test_textedit((5, 2), "* *____|_____", |t| {
+            t.set("ab cd\nefg h");
+            t.delete(..)
+        });
+        test_textedit((5, 2), "ab * *_|efg h", |t| {
+            t.set("ab cd\nefg h");
+            t.move_cursor_to(TextTarget::backward(TextElement::DocumentBoundary))
+                .unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+                .unwrap();
+
+            t.delete(TextTarget::cursor()..TextTarget::forward(TextElement::LineSeparator))
+        });
+    }
+
+    #[test]
     fn test_single_line_simple() {
         test_textedit((5, 1), "abc* *_", |t| {
             t.write('a').unwrap();
@@ -591,7 +913,8 @@ mod test {
             t.write('a').unwrap();
             t.write('b').unwrap();
             t.write('c').unwrap();
-            t.move_cursor_to_beginning_of_line();
+            t.move_cursor_to(TextTarget::backward(TextElement::LineSeparator))
+                .unwrap();
             t.move_cursor_right().unwrap();
             t.write('d').unwrap();
         });
@@ -600,7 +923,8 @@ mod test {
             t.write('b').unwrap();
             t.write('c').unwrap();
             t.move_cursor_left().unwrap();
-            t.move_cursor_to_end_of_line();
+            t.move_cursor_to(TextTarget::forward(TextElement::LineSeparator))
+                .unwrap();
         });
     }
 
@@ -679,7 +1003,8 @@ mod test {
             t.write('d').unwrap();
             t.write('e').unwrap();
             t.write('f').unwrap();
-            t.move_cursor_to_beginning_of_line();
+            t.move_cursor_to(TextTarget::backward(TextElement::LineSeparator))
+                .unwrap();
         });
     }
 
@@ -761,7 +1086,8 @@ mod test {
             t.write('c').unwrap();
             t.write('d').unwrap();
             t.write('e').unwrap();
-            t.move_cursor_to_beginning_of_line();
+            t.move_cursor_to(TextTarget::backward(TextElement::LineSeparator))
+                .unwrap();
         });
     }
 
@@ -776,7 +1102,8 @@ mod test {
             t.write('c').unwrap();
             t.write('d').unwrap();
             t.write('e').unwrap();
-            t.move_cursor_to_beginning_of_line();
+            t.move_cursor_to(TextTarget::backward(TextElement::LineSeparator))
+                .unwrap();
             t.move_cursor_up().unwrap();
         });
 
@@ -790,10 +1117,191 @@ mod test {
             t.write('d').unwrap();
             t.write('e').unwrap();
             t.move_cursor_up().unwrap();
-            t.move_cursor_to_beginning_of_line();
+            t.move_cursor_to(TextTarget::backward(TextElement::LineSeparator))
+                .unwrap();
             assert!(t.move_cursor_left().is_err());
-            t.move_cursor_to_end_of_line();
+            t.move_cursor_to(TextTarget::forward(TextElement::LineSeparator))
+                .unwrap();
             assert!(t.move_cursor_right().is_err());
+        });
+    }
+
+    #[test]
+    fn test_move_word_begin_forward() {
+        test_textedit((6, 1), "abc *d*e", |t| {
+            t.set("abc de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+                .unwrap();
+        });
+
+        test_textedit((7, 1), "abc de* *", |t| {
+            t.set("abc de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin).nth(2))
+                .unwrap();
+        });
+
+        test_textedit((7, 1), "abc de* *", |t| {
+            t.set("abc de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin).nth(3))
+                .unwrap();
+        });
+
+        test_textedit((8, 1), "abc de* *_", |t| {
+            t.set("abc de");
+            assert!(t
+                .move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+                .is_err());
+        });
+    }
+
+    #[test]
+    fn test_move_word_begin_backward() {
+        test_textedit((6, 1), "abc *d*e", |t| {
+            t.set("abc de");
+            t.move_cursor_to(TextTarget::backward(TextElement::WordBegin))
+                .unwrap();
+        });
+        test_textedit((6, 1), "*a*bc de", |t| {
+            t.set("abc de");
+            t.move_cursor_to(TextTarget::backward(TextElement::WordBegin).nth(2))
+                .unwrap();
+        });
+        test_textedit((6, 1), "*a*bc de", |t| {
+            t.set("abc de");
+            t.move_cursor_to(TextTarget::backward(TextElement::WordBegin).nth(3))
+                .unwrap();
+        });
+        test_textedit((6, 1), "*a*bc de", |t| {
+            t.set("abc de");
+            t.go_to_beginning_of_line().unwrap();
+            assert!(t
+                .move_cursor_to(TextTarget::backward(TextElement::WordBegin))
+                .is_err());
+        });
+    }
+
+    #[test]
+    fn test_move_word_end_forward() {
+        test_textedit((6, 1), "ab*c* de", |t| {
+            t.set("abc de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordEnd))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "abc d*e*", |t| {
+            t.set("abc de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordEnd))
+                .unwrap();
+        });
+
+        test_textedit((7, 1), "abc d*e* ", |t| {
+            t.set("abc de ");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordEnd).nth(2))
+                .unwrap();
+        });
+
+        test_textedit((8, 1), "abc de* *_", |t| {
+            t.set("abc de ");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordEnd).nth(3))
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn test_move_word_end_backward() {
+        test_textedit((6, 1), "ab*c* de", |t| {
+            t.set("abc de");
+            t.move_cursor_left().unwrap();
+            t.move_cursor_to(TextTarget::backward(TextElement::WordEnd).nth(1))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "*a*bc de", |t| {
+            t.set("abc de");
+            t.move_cursor_left().unwrap();
+            t.move_cursor_to(TextTarget::backward(TextElement::WordEnd).nth(2))
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn test_move_line_sep_forward() {
+        test_textedit((3, 2), "ab* *|c__", |t| {
+            t.set("ab\nc");
+            t.move_cursor_up().unwrap();
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::LineSeparator))
+                .unwrap();
+            assert!(t
+                .move_cursor_to(TextTarget::forward(TextElement::LineSeparator))
+                .is_err());
+        });
+    }
+
+    #[test]
+    fn test_move_line_sep_backward() {
+        test_textedit((3, 2), "ab_|*c*__", |t| {
+            t.set("ab\nc");
+            t.move_cursor_to(TextTarget::backward(TextElement::LineSeparator))
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn test_move_sentence_forward() {
+        test_textedit((13, 1), "abc. *d*ef. ghi", |t| {
+            t.set("abc. def. ghi");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::Sentence))
+                .unwrap();
+        });
+
+        test_textedit((13, 1), "abc. def. *g*hi", |t| {
+            t.set("abc. def. ghi");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::Sentence).nth(2))
+                .unwrap();
+        });
+
+        test_textedit((14, 1), "abc. def. ghi* *", |t| {
+            t.set("abc. def. ghi");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::Sentence).nth(3))
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn test_move_sentence_backward() {
+        test_textedit((13, 1), "abc. def. *g*hi", |t| {
+            t.set("abc. def. ghi");
+            t.move_cursor_to(TextTarget::backward(TextElement::Sentence))
+                .unwrap();
+        });
+        test_textedit((13, 1), "abc. *d*ef. ghi", |t| {
+            t.set("abc. def. ghi");
+            t.move_cursor_to(TextTarget::backward(TextElement::Sentence).nth(2))
+                .unwrap();
+        });
+        test_textedit((13, 1), "*a*bc. def. ghi", |t| {
+            t.set("abc. def. ghi");
+            t.move_cursor_to(TextTarget::backward(TextElement::Sentence).nth(3))
+                .unwrap();
+            assert!(t
+                .move_cursor_to(TextTarget::backward(TextElement::Sentence).nth(3))
+                .is_err());
         });
     }
 }
