@@ -9,6 +9,8 @@ use widget::{text_width, Blink, Demand, Demand2D, RenderingHints, Widget};
 /// A part of a text that can be moved to in a `TextEdit`
 #[derive(Copy, Clone)]
 pub enum TextElement {
+    /// The current cursor position (useful for `delete`/`get` etc.)
+    CurrentPosition,
     /// The first character of a WORD
     WordBegin,
     /// The last character of a WORD
@@ -57,7 +59,7 @@ impl TextTarget {
     /// Construct a target exactly at the cursor position
     pub fn cursor() -> Self {
         TextTarget {
-            element: TextElement::GraphemeCluster,
+            element: TextElement::CurrentPosition,
             direction: Direction::Forward,
             count: 0,
         }
@@ -190,6 +192,7 @@ impl Text {
     ) -> Result<TextPosition, TextPosition> {
         let mut clusters = self.grapheme_clusters_forwards(begin);
         let p = match elm {
+            TextElement::CurrentPosition => Some(begin),
             TextElement::GraphemeCluster => self.next_grapheme_cluster(begin).ok(),
             TextElement::WordBegin => find_word_begin(clusters),
             TextElement::WordEnd => {
@@ -224,6 +227,7 @@ impl Text {
     ) -> Result<TextPosition, TextPosition> {
         let clusters = self.grapheme_clusters_backwards(begin);
         let p = match elm {
+            TextElement::CurrentPosition => Some(begin),
             TextElement::GraphemeCluster => self.prev_grapheme_cluster(begin).ok(),
             TextElement::WordBegin => find_word_begin(clusters),
             TextElement::WordEnd => find_word_end(clusters),
