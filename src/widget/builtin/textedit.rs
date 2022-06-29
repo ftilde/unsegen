@@ -12,8 +12,12 @@ pub enum TextElement {
     /// The current cursor position (useful for `delete`/`get` etc.)
     CurrentPosition,
     /// The first character of a WORD
-    WordBegin,
+    WORDBegin,
     /// The last character of a WORD
+    WORDEnd,
+    /// The first character of a Word
+    WordBegin,
+    /// The last character of a Word
     WordEnd,
     /// Roughly, a single "character"
     GraphemeCluster,
@@ -96,8 +100,24 @@ struct ClusterPair {
 }
 
 fn find_word_begin(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPosition> {
+    it.find_map(
+        |p| match (classify_cluster(&p.left), classify_cluster(&p.right)) {
+            (ClusterType::Whitespace, ClusterType::Other | ClusterType::Keyword)
+            | (ClusterType::Keyword, ClusterType::Other)
+            | (ClusterType::Other, ClusterType::Keyword) => Some(p.p_middle),
+            (ClusterType::Other | ClusterType::Keyword, ClusterType::Whitespace)
+            | (ClusterType::Keyword, ClusterType::Keyword)
+            | (ClusterType::Whitespace, ClusterType::Whitespace)
+            | (ClusterType::Other, ClusterType::Other) => None,
+        },
+    )
+}
+
+fn find_big_word_begin(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPosition> {
     it.find_map(|p| {
-        if is_whitespace(&p.left) && !is_whitespace(&p.right) {
+        if classify_cluster(&p.left) == ClusterType::Whitespace
+            && classify_cluster(&p.right) != ClusterType::Whitespace
+        {
             Some(p.p_middle)
         } else {
             None
@@ -106,8 +126,24 @@ fn find_word_begin(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPosi
 }
 
 fn find_word_end(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPosition> {
+    it.find_map(
+        |p| match (classify_cluster(&p.left), classify_cluster(&p.right)) {
+            (ClusterType::Other | ClusterType::Keyword, ClusterType::Whitespace)
+            | (ClusterType::Keyword, ClusterType::Other)
+            | (ClusterType::Other, ClusterType::Keyword) => Some(p.p_left),
+            (ClusterType::Whitespace, ClusterType::Other | ClusterType::Keyword)
+            | (ClusterType::Keyword, ClusterType::Keyword)
+            | (ClusterType::Whitespace, ClusterType::Whitespace)
+            | (ClusterType::Other, ClusterType::Other) => None,
+        },
+    )
+}
+
+fn find_big_word_end(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPosition> {
     it.find_map(|p| {
-        if !is_whitespace(&p.left) && is_whitespace(&p.right) {
+        if classify_cluster(&p.left) != ClusterType::Whitespace
+            && classify_cluster(&p.right) == ClusterType::Whitespace
+        {
             Some(p.p_left)
         } else {
             None
@@ -117,7 +153,7 @@ fn find_word_end(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPositi
 
 fn find_sentence_boundary(mut it: impl Iterator<Item = ClusterPair>) -> Option<TextPosition> {
     it.find_map(|p| {
-        if p.left == "." && is_whitespace(&p.right) {
+        if p.left == "." && classify_cluster(&p.right) == ClusterType::Whitespace {
             Some(p.p_left)
         } else {
             None
@@ -125,8 +161,20 @@ fn find_sentence_boundary(mut it: impl Iterator<Item = ClusterPair>) -> Option<T
     })
 }
 
-fn is_whitespace(s: &str) -> bool {
-    matches!(s, " " | "\n" | "\t")
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum ClusterType {
+    Keyword,
+    Whitespace,
+    Other,
+}
+
+fn classify_cluster(s: &str) -> ClusterType {
+    match s {
+        " " | "\n" | "\t" => ClusterType::Whitespace,
+        "_" => ClusterType::Keyword,
+        s if s.chars().all(char::is_alphanumeric) => ClusterType::Keyword,
+        _ => ClusterType::Other,
+    }
 }
 
 impl Text {
@@ -168,10 +216,9 @@ impl Text {
         &'a self,
         from: TextPosition,
     ) -> impl Iterator<Item = ClusterPair> + 'a {
-        let mut p_right = from;
-        let mut maybe_p_middle = self.prev_grapheme_cluster(p_right).ok();
+        let mut p_middle = from;
+        let mut p_right = self.next_grapheme_cluster(p_middle).unwrap_or(p_middle);
         std::iter::from_fn(move || {
-            let p_middle = maybe_p_middle?;
             let p_left = self.prev_grapheme_cluster(p_middle).ok()?;
             let p = ClusterPair {
                 p_left,
@@ -180,7 +227,7 @@ impl Text {
                 right: self.slice(p_middle..p_right).to_string(),
             };
             p_right = p_middle;
-            maybe_p_middle = Some(p_left);
+            p_middle = p_left;
             Some(p)
         })
     }
@@ -194,7 +241,15 @@ impl Text {
         let p = match elm {
             TextElement::CurrentPosition => Some(begin),
             TextElement::GraphemeCluster => self.next_grapheme_cluster(begin).ok(),
+            TextElement::WORDBegin => find_big_word_begin(clusters),
             TextElement::WordBegin => find_word_begin(clusters),
+            TextElement::WORDEnd => {
+                if let Some(_) = clusters.next() {
+                    find_big_word_end(clusters).or(self.prev_grapheme_cluster(self.end()).ok())
+                } else {
+                    None
+                }
+            }
             TextElement::WordEnd => {
                 if let Some(_) = clusters.next() {
                     find_word_end(clusters).or(self.prev_grapheme_cluster(self.end()).ok())
@@ -204,7 +259,7 @@ impl Text {
             }
             TextElement::Sentence => {
                 if let Some(p) = find_sentence_boundary(clusters) {
-                    find_word_begin(self.grapheme_clusters_forwards(p))
+                    find_big_word_begin(self.grapheme_clusters_forwards(p))
                 } else {
                     None
                 }
@@ -225,15 +280,35 @@ impl Text {
         begin: TextPosition,
         elm: TextElement,
     ) -> Result<TextPosition, TextPosition> {
-        let clusters = self.grapheme_clusters_backwards(begin);
+        let mut clusters = self.grapheme_clusters_backwards(begin);
         let p = match elm {
             TextElement::CurrentPosition => Some(begin),
             TextElement::GraphemeCluster => self.prev_grapheme_cluster(begin).ok(),
-            TextElement::WordBegin => find_word_begin(clusters),
+            TextElement::WORDBegin => {
+                if let Some(_) = clusters.next() {
+                    find_big_word_begin(clusters)
+                } else {
+                    None
+                }
+            }
+            TextElement::WordBegin => {
+                if let Some(_) = clusters.next() {
+                    find_word_begin(clusters)
+                } else {
+                    None
+                }
+            }
+            TextElement::WORDEnd => find_big_word_end(clusters),
             TextElement::WordEnd => find_word_end(clusters),
-            TextElement::Sentence => find_word_begin(clusters)
-                .and_then(|p| find_sentence_boundary(self.grapheme_clusters_backwards(p)))
-                .and_then(|p| find_word_begin(self.grapheme_clusters_forwards(p))),
+            TextElement::Sentence => {
+                if let Some(_) = clusters.next() {
+                    find_big_word_begin(clusters)
+                        .and_then(|p| find_sentence_boundary(self.grapheme_clusters_backwards(p)))
+                        .and_then(|p| find_big_word_begin(self.grapheme_clusters_forwards(p)))
+                } else {
+                    None
+                }
+            }
             TextElement::LineSeparator => Some(self.line_begin(begin)),
             TextElement::DocumentBoundary => Some(self.begin()),
         };
@@ -838,7 +913,7 @@ mod test {
                 t.get(TextTarget::backward(TextElement::GraphemeCluster).nth(2)..),
                 " h"
             );
-            assert_eq!(t.get(TextTarget::backward(TextElement::WordBegin)..), "h");
+            assert_eq!(t.get(TextTarget::backward(TextElement::WORDBegin)..), "h");
             assert_eq!(
                 t.get(TextTarget::backward(TextElement::LineSeparator)..),
                 "efg h"
@@ -856,7 +931,7 @@ mod test {
                 "a"
             );
             assert_eq!(
-                t.get(..=TextTarget::forward(TextElement::WordEnd).nth(2)),
+                t.get(..=TextTarget::forward(TextElement::WORDEnd).nth(2)),
                 "ab cd"
             );
             assert_eq!(
@@ -876,7 +951,7 @@ mod test {
             t.set("ab cd\nefg h");
             t.move_cursor_to(TextTarget::backward(TextElement::DocumentBoundary))
                 .unwrap();
-            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+            t.move_cursor_to(TextTarget::forward(TextElement::WORDBegin))
                 .unwrap();
 
             t.delete(TextTarget::cursor()..TextTarget::forward(TextElement::LineSeparator))
@@ -1131,12 +1206,12 @@ mod test {
     }
 
     #[test]
-    fn test_move_word_begin_forward() {
+    fn test_move_big_word_begin_forward() {
         test_textedit((6, 1), "abc *d*e", |t| {
             t.set("abc de");
             t.go_to_beginning_of_line().unwrap();
             t.move_cursor_right().unwrap();
-            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+            t.move_cursor_to(TextTarget::forward(TextElement::WORDBegin))
                 .unwrap();
         });
 
@@ -1144,7 +1219,7 @@ mod test {
             t.set("abc de");
             t.go_to_beginning_of_line().unwrap();
             t.move_cursor_right().unwrap();
-            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin).nth(2))
+            t.move_cursor_to(TextTarget::forward(TextElement::WORDBegin).nth(2))
                 .unwrap();
         });
 
@@ -1152,41 +1227,134 @@ mod test {
             t.set("abc de");
             t.go_to_beginning_of_line().unwrap();
             t.move_cursor_right().unwrap();
-            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin).nth(3))
+            t.move_cursor_to(TextTarget::forward(TextElement::WORDBegin).nth(3))
                 .unwrap();
         });
 
         test_textedit((8, 1), "abc de* *_", |t| {
             t.set("abc de");
             assert!(t
-                .move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+                .move_cursor_to(TextTarget::forward(TextElement::WORDBegin))
                 .is_err());
         });
     }
 
     #[test]
-    fn test_move_word_begin_backward() {
+    fn test_move_word_begin_forward() {
+        test_textedit((6, 1), "a_c *d*e", |t| {
+            t.set("a_c de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "abc *+*e", |t| {
+            t.set("abc +e");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "ab*+* +e", |t| {
+            t.set("ab+ +e");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "+*b*+ +e", |t| {
+            t.set("+b+ +e");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "+-+ *+*e", |t| {
+            t.set("+-+ +e");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordBegin))
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn test_move_big_word_begin_backward() {
         test_textedit((6, 1), "abc *d*e", |t| {
             t.set("abc de");
-            t.move_cursor_to(TextTarget::backward(TextElement::WordBegin))
+            t.move_cursor_to(TextTarget::backward(TextElement::WORDBegin))
                 .unwrap();
         });
         test_textedit((6, 1), "*a*bc de", |t| {
             t.set("abc de");
-            t.move_cursor_to(TextTarget::backward(TextElement::WordBegin).nth(2))
+            t.move_cursor_to(TextTarget::backward(TextElement::WORDBegin).nth(2))
                 .unwrap();
         });
         test_textedit((6, 1), "*a*bc de", |t| {
             t.set("abc de");
-            t.move_cursor_to(TextTarget::backward(TextElement::WordBegin).nth(3))
+            t.move_cursor_to(TextTarget::backward(TextElement::WORDBegin).nth(3))
                 .unwrap();
         });
         test_textedit((6, 1), "*a*bc de", |t| {
             t.set("abc de");
             t.go_to_beginning_of_line().unwrap();
             assert!(t
-                .move_cursor_to(TextTarget::backward(TextElement::WordBegin))
+                .move_cursor_to(TextTarget::backward(TextElement::WORDBegin))
                 .is_err());
+        });
+    }
+
+    #[test]
+    fn test_move_word_begin_backward() {
+        test_textedit((6, 1), "abc *d*_", |t| {
+            t.set("abc d_");
+            t.move_cursor_to(TextTarget::backward(TextElement::WordBegin))
+                .unwrap();
+        });
+        test_textedit((6, 1), "*-*+- de", |t| {
+            t.set("-+- de");
+            t.move_cursor_to(TextTarget::backward(TextElement::WordBegin).nth(2))
+                .unwrap();
+        });
+        test_textedit((6, 1), "a*+*- de", |t| {
+            t.set("a+- de");
+            t.move_cursor_to(TextTarget::backward(TextElement::WordBegin).nth(2))
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn test_move_big_word_end_forward() {
+        test_textedit((6, 1), "ab*c* de", |t| {
+            t.set("abc de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WORDEnd))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "abc d*e*", |t| {
+            t.set("abc de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_right().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WORDEnd))
+                .unwrap();
+        });
+
+        test_textedit((7, 1), "abc d*e* ", |t| {
+            t.set("abc de ");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WORDEnd).nth(2))
+                .unwrap();
+        });
+
+        test_textedit((8, 1), "abc de* *_", |t| {
+            t.set("abc de ");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WORDEnd).nth(3))
+                .unwrap();
         });
     }
 
@@ -1199,41 +1367,77 @@ mod test {
                 .unwrap();
         });
 
-        test_textedit((6, 1), "abc d*e*", |t| {
-            t.set("abc de");
+        test_textedit((6, 1), "a*b*- de", |t| {
+            t.set("ab- de");
             t.go_to_beginning_of_line().unwrap();
-            t.move_cursor_right().unwrap();
-            t.move_cursor_right().unwrap();
             t.move_cursor_to(TextTarget::forward(TextElement::WordEnd))
                 .unwrap();
         });
 
-        test_textedit((7, 1), "abc d*e* ", |t| {
-            t.set("abc de ");
+        test_textedit((6, 1), "-*b*- de", |t| {
+            t.set("-b- de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordEnd))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "-+*-* de", |t| {
+            t.set("-+- de");
+            t.go_to_beginning_of_line().unwrap();
+            t.move_cursor_to(TextTarget::forward(TextElement::WordEnd))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "-+- d*e*", |t| {
+            t.set("-+- de");
             t.go_to_beginning_of_line().unwrap();
             t.move_cursor_to(TextTarget::forward(TextElement::WordEnd).nth(2))
                 .unwrap();
         });
+    }
 
-        test_textedit((8, 1), "abc de* *_", |t| {
-            t.set("abc de ");
-            t.go_to_beginning_of_line().unwrap();
-            t.move_cursor_to(TextTarget::forward(TextElement::WordEnd).nth(3))
+    #[test]
+    fn test_move_big_word_end_backward() {
+        test_textedit((6, 1), "ab*c* de", |t| {
+            t.set("abc de");
+            t.move_cursor_left().unwrap();
+            t.move_cursor_to(TextTarget::backward(TextElement::WORDEnd).nth(1))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "*a*bc de", |t| {
+            t.set("abc de");
+            t.move_cursor_left().unwrap();
+            t.move_cursor_to(TextTarget::backward(TextElement::WORDEnd).nth(2))
                 .unwrap();
         });
     }
 
     #[test]
     fn test_move_word_end_backward() {
-        test_textedit((6, 1), "ab*c* de", |t| {
-            t.set("abc de");
+        test_textedit((6, 1), "ab*c* _e", |t| {
+            t.set("abc _e");
             t.move_cursor_left().unwrap();
             t.move_cursor_to(TextTarget::backward(TextElement::WordEnd).nth(1))
                 .unwrap();
         });
 
-        test_textedit((6, 1), "*a*bc de", |t| {
-            t.set("abc de");
+        test_textedit((6, 1), "*a*bc _e", |t| {
+            t.set("abc _e");
+            t.move_cursor_left().unwrap();
+            t.move_cursor_to(TextTarget::backward(TextElement::WordEnd).nth(2))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "a*-*c _e", |t| {
+            t.set("a-c _e");
+            t.move_cursor_left().unwrap();
+            t.move_cursor_to(TextTarget::backward(TextElement::WordEnd).nth(2))
+                .unwrap();
+        });
+
+        test_textedit((6, 1), "*a*-+ _e", |t| {
+            t.set("a-+ _e");
             t.move_cursor_left().unwrap();
             t.move_cursor_to(TextTarget::backward(TextElement::WordEnd).nth(2))
                 .unwrap();
