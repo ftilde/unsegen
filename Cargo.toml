@@ -12,7 +12,7 @@ keywords = ["terminal", "tui"]
 
 [dependencies]
 ndarray = "0.8"
-nix = "0.17"
+nix = "0.24"
 raw_tty = "0.1"
 smallvec = "0.3"
 termion = "1.5"
