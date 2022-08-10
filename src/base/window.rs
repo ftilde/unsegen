@@ -34,7 +34,7 @@ impl Default for StyledGraphemeCluster {
 pub(in base) type CharMatrix = Array<StyledGraphemeCluster, Ix2>;
 
 /// An owned buffer representing a Window.
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct WindowBuffer {
     storage: CharMatrix,
 }

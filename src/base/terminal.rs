@@ -42,6 +42,7 @@ where
     T: AsRawFd + Write,
 {
     values: WindowBuffer,
+    old_values: WindowBuffer,
     terminal: TtyWithGuard<T>,
     size_has_changed_since_last_present: bool,
     bell_to_emit: bool,
@@ -59,6 +60,7 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
         terminal.set_raw_mode()?;
         let mut term = Terminal {
             values: WindowBuffer::new(Width::new(0).unwrap(), Height::new(0).unwrap()),
+            old_values: WindowBuffer::new(Width::new(0).unwrap(), Height::new(0).unwrap()),
             terminal,
             size_has_changed_since_last_present: true,
             bell_to_emit: false,
@@ -167,15 +169,23 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
     pub fn present(&mut self) {
         let mut current_style = Style::default();
 
+        let mut num_potentially_unchanged_lines = self.old_values.storage().dim().0;
+
         if self.size_has_changed_since_last_present {
             write!(self.terminal, "{}", termion::clear::All).expect("clear");
             self.size_has_changed_since_last_present = false;
+            num_potentially_unchanged_lines = 0;
         }
         if self.bell_to_emit {
             write!(self.terminal, "\x07").expect("emit bell");
             self.bell_to_emit = false;
         }
         for (y, line) in self.values.storage().axis_iter(Axis(0)).enumerate() {
+            if y < num_potentially_unchanged_lines
+                && self.old_values.storage().subview(Axis(0), y) == line
+            {
+                continue;
+            }
             write!(
                 self.terminal,
                 "{}",
@@ -202,6 +212,7 @@ impl<'a, T: Write + AsRawFd> Terminal<'a, T> {
             write!(self.terminal, "{}", buffer).expect("write leftover buffer contents");
         }
         let _ = self.terminal.flush();
+        self.old_values = self.values.clone();
     }
 }
 
