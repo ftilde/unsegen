@@ -2,7 +2,7 @@
 //! writing to Windows using Cursors.
 //!
 //! # Example:
-//! ```no_run //tests do not provide a fully functional terminal
+//! ```no_run
 //! use unsegen::base::*;
 //! use std::io::stdout;
 //! use std::fmt::Write;

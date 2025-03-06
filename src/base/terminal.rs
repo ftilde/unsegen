@@ -5,7 +5,7 @@
 //!
 //! # Examples:
 //!
-//! ```no_run //tests do not provide a fully functional terminal
+//! ```no_run
 //! use unsegen::base::Terminal;
 //! use std::io::stdout;
 //! let stdout = stdout();

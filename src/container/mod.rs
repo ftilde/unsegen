@@ -4,7 +4,7 @@
 //! analogon of a window manager.
 //!
 //! # Example:
-//! ```no_run //tests do not provide a fully functional terminal
+//! ```no_run
 //! use unsegen::base::*;
 //! use unsegen::container::*;
 //! use unsegen::input::*;

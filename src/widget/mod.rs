@@ -2,8 +2,7 @@
 //! user interfaces.
 //!
 //! # Example:
-//! ```no_run //tests do not provide a fully functional terminal
-//!
+//! ```no_run
 //! use unsegen::base::*;
 //! use unsegen::widget::*;
 //! use unsegen::widget::builtin::*;
