@@ -108,7 +108,7 @@ impl<R: TableRow + 'static> Table<R> {
     }
 
     /// Access the content of the table immutably.
-    pub fn rows(&mut self) -> &Vec<R> {
+    pub fn rows(&self) -> &Vec<R> {
         &self.rows
     }
 
