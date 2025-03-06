@@ -169,7 +169,7 @@ pub fn layout_linearly<T: AxisDimension + Ord + Debug + Clone>(
     }
 
     let mut assigned_int = assigned_spaces
-        .into_iter()
+        .iter()
         .map(|f| PositiveAxisDiff::<T>::new_unchecked(*f as i32))
         .collect::<Vec<_>>();
 

@@ -465,7 +465,7 @@ impl<'a, C: ContainerProvider> Layout<C> for HSplit<'a, C> {
         );
         let mut output = LayoutOutput::new();
         let mut p = available_area.x_range.start;
-        for (elm, space) in self.elms.iter().zip(assigned_spaces.into_iter()) {
+        for (elm, space) in self.elms.iter().zip(assigned_spaces.iter()) {
             let elm_rect = available_area.slice_range_x(p..(p + *space));
             output.add_child(elm.layout(elm_rect, containers));
             p += *space;
@@ -553,7 +553,7 @@ impl<'a, C: ContainerProvider> Layout<C> for VSplit<'a, C> {
         );
         let mut output = LayoutOutput::new();
         let mut p = available_area.y_range.start;
-        for (elm, space) in self.elms.iter().zip(assigned_spaces.into_iter()) {
+        for (elm, space) in self.elms.iter().zip(assigned_spaces.iter()) {
             let elm_rect = available_area.slice_range_y(p..(p + *space));
             output.add_child(elm.layout(elm_rect, containers));
             p += *space;
