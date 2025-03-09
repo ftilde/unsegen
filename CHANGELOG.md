@@ -2,7 +2,7 @@
 
 All breaking changes are marked with [BC] and potentially require API consumer changes after updating to the respective version.
 
-## [0.3.1] - UNRELEASED
+## [0.3.1] - 2025-03-09
 ### Added
 - Add `WithHints` and WidgetExt `with_hints`.
 - Add `Cursor::move_to_bottom`, `Cursor::target`.
