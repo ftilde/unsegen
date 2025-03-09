@@ -9,6 +9,9 @@ All breaking changes are marked with [BC] and potentially require API consumer c
 - Add `TextEdit` widget which allows multi line editing.
 ### Changed
 - Avoid writing unchanged lines to terminal.
+### Fixed
+- Make Table::rows take an immutable self reference.
+- Fix `Cursor::move_left` if position is outside of window.
 
 ## [0.3.0] - 2021-06-03
 ### Added
