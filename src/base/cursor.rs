@@ -184,14 +184,14 @@ impl<'c, 'g: 'c, T: 'c + CursorTarget> Cursor<'c, 'g, T> {
                 self.state.x = self.state.x - 1;
             }
 
-            // Exit conditions:
-            // - outside of window
-            if self.state.y < 0 {
-                break;
-            }
-            // on a non-zero width cluster
             let current = self.get_current_cell_mut();
-            if current.is_some() && current.unwrap().grapheme_cluster.width() > 0 {
+            // Exit conditions:
+            // - on a non-zero width cluster
+            // - outside of window (current is None)
+            if current
+                .map(|c| c.grapheme_cluster.width() > 0)
+                .unwrap_or(true)
+            {
                 break;
             }
         }
